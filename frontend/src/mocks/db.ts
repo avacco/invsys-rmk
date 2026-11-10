@@ -1,4 +1,4 @@
-import type { AuditInfo, Category, PermissionValue, Product, Role, Supplier, Unit, User } from '@/api/types'
+import type { AuditInfo, Category, Movement, PermissionValue, Product, Role, Supplier, Unit, User, Warehouse } from '@/api/types'
 
 /**
  * "Base de datos" del modo demo. Vive en memoria y se persiste en localStorage,
@@ -17,15 +17,25 @@ export interface DemoDb {
   units: Unit[]
   suppliers: Supplier[]
   products: Product[]
+  warehouses: Warehouse[]
+  /** Saldos por producto y almacén. */
+  stock: StockRow[]
+  movements: Movement[]
+}
+
+export interface StockRow {
+  productId: number
+  warehouseId: number
+  quantity: number
 }
 
 const STORAGE_KEY = 'invsys-demo-db'
 const VERSION_KEY = 'invsys-demo-db-version'
-const VERSION = '1'
+const VERSION = '2'
 
 export const ALL_PERMISSIONS: PermissionValue[] = [
   'catalog:read', 'catalog:write', 'partners:read', 'partners:write',
-  'users:read', 'users:write', 'roles:read', 'roles:write',
+  'users:read', 'users:write', 'roles:read', 'roles:write', 'inventory:read', 'inventory:write',
 ]
 
 export function audit(by = 'system', at = new Date().toISOString()): AuditInfo {
@@ -37,8 +47,8 @@ function seed(): DemoDb {
   const roles: Role[] = [
     { id: 1, name: 'ADMIN', description: 'Acceso total al sistema', system: true, permissions: [...ALL_PERMISSIONS], audit: a },
     { id: 2, name: 'MANAGER', description: 'Gestiona catálogo y proveedores', system: false,
-      permissions: ['catalog:read', 'catalog:write', 'partners:read', 'partners:write', 'users:read'], audit: a },
-    { id: 3, name: 'VIEWER', description: 'Solo lectura', system: false, permissions: ['catalog:read', 'partners:read'], audit: a },
+      permissions: ['catalog:read', 'catalog:write', 'inventory:read', 'inventory:write', 'partners:read', 'partners:write', 'users:read'], audit: a },
+    { id: 3, name: 'VIEWER', description: 'Solo lectura', system: false, permissions: ['catalog:read', 'inventory:read', 'partners:read'], audit: a },
   ]
   const ref = (r: Role) => ({ id: r.id, name: r.name })
   const users: DemoUser[] = [
@@ -86,7 +96,29 @@ function seed(): DemoDb {
     p(9, 'IND-001', 'Botas de seguridad', 'Puntera de acero', 4, 'u', null, 25, 42, 4),
     p(10, 'IND-002', 'Guantes de nitrilo', 'Discontinuado', 4, 'box', null, 3, 5.5, 0, 'INACTIVE'),
   ]
-  return { seq: 100, roles, users, categories, units, suppliers, products }
+  const warehouses: Warehouse[] = [
+    { id: 1, code: 'MAIN', name: 'Almacén principal', active: true, audit: a },
+    { id: 2, code: 'NORTH', name: 'Depósito Norte', address: 'Parque industrial, nave 4', active: true, audit: a },
+  ]
+  // Stock inicial: [productId, warehouseId, cantidad]
+  const initial: [number, number, number][] = [
+    [1, 1, 35], [1, 2, 10], [2, 1, 40], [3, 1, 4.5], [4, 1, 60], [4, 2, 24], [5, 2, 80],
+    [6, 1, 3], [7, 2, 40], [8, 1, 500], [8, 2, 150], [9, 1, 12],
+  ]
+  let movementId = 0
+  const stock: StockRow[] = initial.map(([productId, warehouseId, quantity]) => ({ productId, warehouseId, quantity }))
+  const movements: Movement[] = initial.map(([productId, warehouseId, quantity], i) => {
+    const product = products[productId - 1]
+    const warehouse = warehouses[warehouseId - 1]
+    return {
+      id: ++movementId, type: 'IN', quantity, balanceAfter: quantity, reason: 'Inventario inicial',
+      product: { id: product.id, sku: product.sku, name: product.name, unitCode: product.unit.code, unitDecimals: product.unit.decimals },
+      warehouse: { id: warehouse.id, code: warehouse.code, name: warehouse.name },
+      // Repartidos en los últimos días para que el resumen de la demo muestre actividad.
+      createdAt: new Date(Date.now() - (initial.length - i) * 9 * 3_600_000).toISOString(), createdBy: 'system',
+    }
+  })
+  return { seq: 100, roles, users, categories, units, suppliers, products, warehouses, stock, movements }
 }
 
 let db: DemoDb | null = null

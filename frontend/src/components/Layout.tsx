@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { Boxes, Home, LogOut, Menu, Moon, Package, ShieldCheck, Sun, Truck, Users, X, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, Boxes, ClipboardList, Home, LogOut, Menu, Moon, Package, ShieldCheck, Sun, Truck, Users, Warehouse, X, type LucideIcon } from 'lucide-react'
 import type { PermissionValue } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
 import { useUi } from '@/store/ui'
@@ -19,8 +19,11 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Inicio', icon: Home },
+  { to: '/inventory', label: 'Stock', icon: ClipboardList, permission: 'inventory:read' },
+  { to: '/inventory/movements', label: 'Movimientos', icon: ArrowLeftRight, permission: 'inventory:read' },
   { to: '/products', label: 'Productos', icon: Package, permission: 'catalog:read' },
   { to: '/catalog', label: 'Categorías y unidades', icon: Boxes, permission: 'catalog:read' },
+  { to: '/warehouses', label: 'Almacenes', icon: Warehouse, permission: 'inventory:read' },
   { to: '/suppliers', label: 'Proveedores', icon: Truck, permission: 'partners:read' },
   { to: '/users', label: 'Usuarios', icon: Users, permission: 'users:read' },
   { to: '/roles', label: 'Roles y permisos', icon: ShieldCheck, permission: 'roles:read' },
@@ -56,7 +59,7 @@ export function Layout() {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === '/' || to === '/inventory'}
               onClick={closeOnMobile}
               title={sidebarCollapsed ? label : undefined}
               className={({ isActive }) =>

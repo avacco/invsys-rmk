@@ -16,6 +16,7 @@ import com.invsys.shared.web.ConflictException;
 import com.invsys.shared.web.NotFoundException;
 import com.invsys.storage.FileStorage;
 import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -32,14 +33,16 @@ public class ProductService {
     private final UnitRepository units;
     private final SupplierRepository suppliers;
     private final FileStorage storage;
+    private final List<ProductUsage> usages;
 
     public ProductService(ProductRepository products, CategoryRepository categories, UnitRepository units,
-                          SupplierRepository suppliers, FileStorage storage) {
+                          SupplierRepository suppliers, FileStorage storage, List<ProductUsage> usages) {
         this.products = products;
         this.categories = categories;
         this.units = units;
         this.suppliers = suppliers;
         this.storage = storage;
+        this.usages = usages;
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +76,9 @@ public class ProductService {
 
     public void delete(Long id) {
         Product product = find(id);
+        if (usages.stream().anyMatch(u -> u.isInUse(id))) {
+            throw new ConflictException("El producto tiene movimientos de stock; desactivalo en lugar de eliminarlo");
+        }
         String imageUrl = product.getImageUrl();
         products.delete(product);
         products.flush();

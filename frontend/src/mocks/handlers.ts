@@ -1,6 +1,7 @@
 import { http, HttpResponse, type PathParams } from 'msw'
 import { API_BASE } from '@/api/client'
 import type {
+  InventorySummary, Movement, MovementRequest, MovementType, ProductStock, Warehouse, WarehouseRequest,
   AuditInfo, CategoryRequest, CreateUserRequest, Me, PermissionInfo, PermissionValue, Product, ProductRequest, Role,
   RoleRequest, Supplier, SupplierRequest, UnitRequest, UpdateUserRequest, User,
 } from '@/api/types'
@@ -93,7 +94,7 @@ function requireFields(fields: Record<string, string | false>) {
 
 const SORT_GETTERS: Record<string, (x: never) => unknown> = {
   updatedAt: (x: { audit: { updatedAt: string } }) => x.audit.updatedAt,
-  createdAt: (x: { audit: { createdAt: string } }) => x.audit.createdAt,
+  createdAt: (x: { audit?: { createdAt: string }; createdAt?: string }) => x.createdAt ?? x.audit?.createdAt,
 }
 
 function paginate<T>(items: T[], request: Request, defaultSort: string) {
@@ -101,6 +102,11 @@ function paginate<T>(items: T[], request: Request, defaultSort: string) {
   const page = Math.max(0, Number(params.get('page') ?? 0))
   const size = Math.min(100, Math.max(1, Number(params.get('size') ?? 20)))
   const [field, dir = 'asc'] = (params.get('sort') ?? defaultSort).split(',')
+  if (field === 'none') {
+    const totalElements = items.length
+    return HttpResponse.json({ content: items.slice(page * size, page * size + size), page, size, totalElements,
+      totalPages: Math.ceil(totalElements / size) })
+  }
   const getter = SORT_GETTERS[field] ?? ((x: Record<string, unknown>) => x[field])
   const sorted = [...items].sort((a, b) => {
     const va = getter(a as never) as string | number
@@ -174,7 +180,7 @@ function buildSupplier(body: SupplierRequest, existing: Supplier | undefined, by
 
 // ---------- handlers ----------
 
-export const handlers = [
+const baseHandlers = [
   // Meta y autenticación
   http.get(url('/meta'), () => HttpResponse.json({ currency: 'USD' })),
 
@@ -246,6 +252,9 @@ export const handlers = [
   http.delete(url('/products/:id'), guarded('catalog:write', ({ params }) => {
     const db = getDb()
     if (!db.products.some((p) => p.id === idParam(params))) fail(404, `Producto ${params.id} no existe`)
+    if (db.movements.some((m) => m.product.id === idParam(params))) {
+      fail(409, 'El producto tiene movimientos de stock; desactivalo en lugar de eliminarlo')
+    }
     db.products = db.products.filter((p) => p.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
   })),
@@ -451,8 +460,186 @@ export const handlers = [
   })),
 ]
 
+// ---------- inventario ----------
+
+function stockOf(productId: number, warehouseId: number) {
+  const db = getDb()
+  let row = db.stock.find((r) => r.productId === productId && r.warehouseId === warehouseId)
+  if (!row) {
+    row = { productId, warehouseId, quantity: 0 }
+    db.stock.push(row)
+  }
+  return row
+}
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000
+
+function activeWarehouse(id: number | null | undefined): Warehouse {
+  const w = getDb().warehouses.find((x) => x.id === id) ?? fail(400, `El almacén ${id} no existe`)
+  if (!w.active) fail(400, `El almacén ${w.name} está inactivo`)
+  return w
+}
+
+function applyMovement(type: MovementType, product: Product, warehouse: Warehouse, delta: number,
+  body: MovementRequest, by: string, group?: string): Movement {
+  const row = stockOf(product.id, warehouse.id)
+  if (round3(row.quantity + delta) < 0) {
+    fail(409, `Stock insuficiente en ${warehouse.name}: disponible ${row.quantity} ${product.unit.code}`)
+  }
+  row.quantity = round3(row.quantity + delta)
+  const movement: Movement = {
+    id: nextId(), type, quantity: round3(delta), balanceAfter: row.quantity,
+    reason: blank(body.reason), reference: blank(body.reference), transferGroup: group,
+    product: { id: product.id, sku: product.sku, name: product.name, unitCode: product.unit.code, unitDecimals: product.unit.decimals },
+    warehouse: { id: warehouse.id, code: warehouse.code, name: warehouse.name },
+    createdAt: new Date().toISOString(), createdBy: by,
+  }
+  getDb().movements.push(movement)
+  return movement
+}
+
+function registerMovement(body: MovementRequest, by: string): Movement[] {
+  const db = getDb()
+  const product = db.products.find((p) => p.id === body.productId) ?? fail(400, `El producto ${body.productId} no existe`)
+  const source = activeWarehouse(body.warehouseId)
+  const qty = Number(body.quantity)
+  if (!Number.isFinite(qty) || qty < 0) fail(400, 'Datos inválidos', { quantity: 'debe ser mayor o igual que 0' })
+  const factor = 10 ** product.unit.decimals
+  if (Math.abs(qty * factor - Math.round(qty * factor)) > 1e-9) {
+    fail(400, product.unit.decimals === 0 ? `La unidad ${product.unit.name} no admite decimales`
+      : `La unidad ${product.unit.name} admite hasta ${product.unit.decimals} decimales`)
+  }
+  const positive = () => { if (qty <= 0) fail(400, 'La cantidad debe ser mayor que cero') }
+  switch (body.type) {
+    case 'IN':
+      positive()
+      return [applyMovement('IN', product, source, qty, body, by)]
+    case 'OUT':
+      positive()
+      return [applyMovement('OUT', product, source, -qty, body, by)]
+    case 'ADJUSTMENT': {
+      if (!blank(body.reason)) fail(400, 'Indicá el motivo del ajuste')
+      const delta = round3(qty - stockOf(product.id, source.id).quantity)
+      if (delta === 0) fail(400, 'El saldo contado coincide con el registrado; no hay nada que ajustar')
+      return [applyMovement('ADJUSTMENT', product, source, delta, body, by)]
+    }
+    case 'TRANSFER': {
+      positive()
+      if (!body.targetWarehouseId) fail(400, 'Indicá el almacén de destino')
+      if (body.targetWarehouseId === source.id) fail(400, 'El almacén de destino debe ser distinto del de origen')
+      const target = activeWarehouse(body.targetWarehouseId)
+      const group = crypto.randomUUID()
+      return [
+        applyMovement('TRANSFER_OUT', product, source, -qty, body, by, group),
+        applyMovement('TRANSFER_IN', product, target, qty, body, by, group),
+      ]
+    }
+    default:
+      return fail(400, 'Datos inválidos', { type: 'valor inválido' })
+  }
+}
+
+function productStock(product: Product): ProductStock {
+  const db = getDb()
+  const levels = db.stock
+    .filter((r) => r.productId === product.id)
+    .map((r) => {
+      const w = db.warehouses.find((x) => x.id === r.warehouseId)!
+      return { warehouse: { id: w.id, code: w.code, name: w.name }, quantity: r.quantity }
+    })
+    .sort((x, y) => x.warehouse.name.localeCompare(y.warehouse.name))
+  const total = round3(levels.reduce((sum, l) => sum + l.quantity, 0))
+  return {
+    product: { id: product.id, sku: product.sku, name: product.name, unitCode: product.unit.code, unitDecimals: product.unit.decimals },
+    minStock: product.minStock, total, low: product.minStock > 0 && total < product.minStock, levels,
+  }
+}
+
+export const inventoryHandlers = [
+  http.get(url('/warehouses'), guarded('inventory:read', () =>
+    HttpResponse.json([...getDb().warehouses].sort((a, b) => a.name.localeCompare(b.name))))),
+
+  http.post(url('/warehouses'), guarded('inventory:write', async ({ request, user }) => {
+    const body = (await request.json()) as WarehouseRequest
+    requireFields({ code: !body.code?.trim() && 'no debe estar vacío', name: !body.name?.trim() && 'no debe estar vacío' })
+    const db = getDb()
+    const code = body.code.trim().toUpperCase()
+    if (db.warehouses.some((w) => w.code === code)) fail(409, `Ya existe un almacén con el código ${code}`)
+    const warehouse: Warehouse = { id: nextId(), code, name: body.name.trim(), address: blank(body.address),
+      active: body.active ?? true, audit: audit(user.username) }
+    db.warehouses.push(warehouse)
+    return HttpResponse.json(warehouse, { status: 201 })
+  })),
+
+  http.put(url('/warehouses/:id'), guarded('inventory:write', async ({ request, params, user }) => {
+    const db = getDb()
+    const warehouse = db.warehouses.find((w) => w.id === idParam(params)) ?? fail(404, `Almacén ${params.id} no existe`)
+    const body = (await request.json()) as WarehouseRequest
+    const code = body.code.trim().toUpperCase()
+    if (db.warehouses.some((w) => w.id !== warehouse.id && w.code === code)) fail(409, `Ya existe un almacén con el código ${code}`)
+    Object.assign(warehouse, { code, name: body.name.trim(), address: blank(body.address), active: body.active ?? true })
+    for (const m of db.movements) if (m.warehouse.id === warehouse.id) m.warehouse = { id: warehouse.id, code, name: warehouse.name }
+    return HttpResponse.json(touch(warehouse, user.username))
+  })),
+
+  http.delete(url('/warehouses/:id'), guarded('inventory:write', ({ params }) => {
+    const db = getDb()
+    if (!db.warehouses.some((w) => w.id === idParam(params))) fail(404, `Almacén ${params.id} no existe`)
+    if (db.movements.some((m) => m.warehouse.id === idParam(params))) {
+      fail(409, 'El almacén tiene movimientos registrados; desactivalo en lugar de eliminarlo')
+    }
+    db.warehouses = db.warehouses.filter((w) => w.id !== idParam(params))
+    return new HttpResponse(null, { status: 204 })
+  })),
+
+  http.get(url('/inventory/stock'), guarded('inventory:read', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const q = params.get('q')?.trim().toLowerCase()
+    const categoryId = params.get('categoryId')
+    const lowOnly = params.get('lowOnly') === 'true'
+    const rows = getDb().products
+      .filter((p) => p.status === 'ACTIVE' &&
+        (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)) &&
+        (!categoryId || p.category?.id === Number(categoryId)))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(productStock)
+      .filter((r) => !lowOnly || r.low)
+    return paginate(rows, request, 'none')
+  })),
+
+  http.get(url('/inventory/movements'), guarded('inventory:read', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const productId = params.get('productId')
+    const warehouseId = params.get('warehouseId')
+    const type = params.get('type')
+    const rows = getDb().movements.filter((m) =>
+      (!productId || m.product.id === Number(productId)) &&
+      (!warehouseId || m.warehouse.id === Number(warehouseId)) &&
+      (!type || m.type === type))
+    return paginate(rows, request, 'createdAt,desc')
+  })),
+
+  http.post(url('/inventory/movements'), guarded('inventory:write', async ({ request, user }) =>
+    HttpResponse.json(registerMovement((await request.json()) as MovementRequest, user.username), { status: 201 }))),
+
+  http.get(url('/inventory/summary'), guarded('inventory:read', () => {
+    const db = getDb()
+    const weekAgo = Date.now() - 7 * 24 * 3_600_000
+    const summary: InventorySummary = {
+      inventoryValue: Math.round(db.stock.reduce((sum, r) =>
+        sum + r.quantity * (db.products.find((p) => p.id === r.productId)?.costPrice ?? 0), 0) * 100) / 100,
+      lowStockProducts: db.products.filter((p) => p.status === 'ACTIVE' && productStock(p).low).length,
+      movementsLast7Days: db.movements.filter((m) => Date.parse(m.createdAt) >= weekAgo).length,
+      activeWarehouses: db.warehouses.filter((w) => w.active).length,
+    }
+    return HttpResponse.json(summary)
+  })),
+]
+
 function validateRole(body: RoleRequest) {
   requireFields({ name: (!body.name || !/^[A-Z0-9_]+$/.test(body.name)) && 'mayúsculas, números y guion bajo' })
   const unknown = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p))
   if (unknown.length > 0) fail(400, `Permisos desconocidos: ${unknown.join(', ')}`)
 }
+
+export const handlers = [...baseHandlers, ...inventoryHandlers]

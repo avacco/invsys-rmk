@@ -1,6 +1,6 @@
 # Invsys
 
-Sistema de gestión de inventario: catálogo de productos, proveedores, usuarios con roles y permisos, y (próximamente) stock por almacén basado en movimientos.
+Sistema de gestión de inventario: catálogo de productos, stock por almacén basado en movimientos, proveedores, y usuarios con roles y permisos.
 
 Proyecto de portfolio. Es una **base general y neutral respecto del país**: no implementa reglas fiscales ni regulatorias, pero está diseñado para que puedan agregarse como módulos (ver [ADR 0001](docs/adr/0001-monorepo-y-monolito-modular.md)).
 
@@ -9,7 +9,10 @@ Proyecto de portfolio. Es una **base general y neutral respecto del país**: no 
 - **Sesión segura:** JWT en cookies httpOnly, refresh tokens rotativos con detección de reutilización ([ADR 0004](docs/adr/0004-sesion-con-cookies-httponly.md)).
 - **Roles y permisos** `recurso:operación`, aplicados en cada endpoint y reflejados en la interfaz.
 - **Productos:** SKU, categoría, unidad de medida, proveedor, costo, precio de venta, stock mínimo, imagen. Búsqueda, filtros, orden, paginación, vista de tarjetas o tabla y exportación CSV.
-- **Categorías, unidades de medida y proveedores** con validación de referencias (no se borra lo que está en uso).
+- **Stock por almacén basado en movimientos** ([ADR 0003](docs/adr/0003-stock-basado-en-movimientos.md)): entradas, salidas, ajustes por conteo y transferencias. El historial es inmutable, el saldo nunca queda negativo (bloqueo de fila ante operaciones simultáneas) y las cantidades respetan los decimales de cada unidad.
+- **Alertas de stock bajo:** filtro de productos bajo su mínimo, resumen en el inicio y un evento de dominio listo para enchufar notificaciones.
+- **Inicio con indicadores reales:** valor del inventario al costo, productos con stock bajo, movimientos de la semana y últimos movimientos.
+- **Categorías, unidades de medida, almacenes y proveedores** con validación de referencias (no se borra lo que está en uso).
 - **Usuarios y roles** administrables desde la interfaz.
 - **Auditoría básica:** cada registro guarda quién y cuándo lo creó y lo modificó, tomado de la sesión.
 - **Modo demo sin backend:** el frontend se publica como sitio estático con una API simulada ([ADR 0002](docs/adr/0002-demo-frontend-sin-backend.md)).
@@ -33,6 +36,7 @@ invsys/
 │   └── src/main/java/com/invsys/
 │       ├── identity/    usuarios, roles, permisos, autenticación
 │       ├── catalog/     productos, categorías, unidades
+│       ├── inventory/   almacenes, saldos y movimientos de stock
 │       ├── partners/    proveedores
 │       ├── storage/     almacenamiento de imágenes (intercambiable)
 │       └── shared/      auditoría, errores, paginación
@@ -71,7 +75,7 @@ Usuarios de prueba (perfil `dev` y demo):
 | Usuario | Contraseña | Rol |
 |---|---|---|
 | `admin` | `admin1234` | ADMIN — acceso total |
-| `manager` | `manager1234` | MANAGER — catálogo y proveedores |
+| `manager` | `manager1234` | MANAGER — catálogo, inventario y proveedores |
 | `viewer` | `viewer1234` | VIEWER — solo lectura |
 
 Documentación interactiva de la API: http://localhost:8080/api/docs/ui
@@ -99,6 +103,6 @@ cd frontend && npm test
 
 - [x] **Fase 0 — Base:** monorepo, entorno local, ADRs
 - [x] **Fase 1 — Identity y catálogo:** autenticación, permisos, catálogo, proveedores, usuarios, demo, CI
-- [ ] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo ([ADR 0003](docs/adr/0003-stock-basado-en-movimientos.md))
-- [ ] **Fase 3 — Visibilidad:** dashboard y auditoría completos, i18n (es/en)
+- [x] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo
+- [ ] **Fase 3 — Visibilidad:** registro de auditoría completo, reportes, i18n (es/en)
 - [ ] **Fase 4 — Vidriera:** tests E2E, capturas, documentación final

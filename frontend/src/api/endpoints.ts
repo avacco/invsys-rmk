@@ -2,7 +2,8 @@ import { request } from './client'
 import type {
   Category, CategoryRequest, CreateUserRequest, LoginRequest, Me, Meta, Page, PageQuery, PermissionInfo,
   Product, ProductQuery, ProductRequest, Role, RoleRequest, Supplier, SupplierQuery, SupplierRequest,
-  Unit, UnitRequest, UpdateUserRequest, User,
+  Unit, UnitRequest, UpdateUserRequest, User, Warehouse, WarehouseRequest, Movement, MovementQuery,
+  MovementRequest, ProductStock, StockQuery, InventorySummary,
 } from './types'
 
 export const authApi = {
@@ -64,4 +65,18 @@ export const rolesApi = {
   update: (id: number, body: RoleRequest) => request<Role>(`/roles/${id}`, { method: 'PUT', body }),
   remove: (id: number) => request<void>(`/roles/${id}`, { method: 'DELETE' }),
   permissions: () => request<PermissionInfo[]>('/permissions'),
+}
+
+export const warehousesApi = {
+  list: () => request<Warehouse[]>('/warehouses'),
+  create: (body: WarehouseRequest) => request<Warehouse>('/warehouses', { method: 'POST', body }),
+  update: (id: number, body: WarehouseRequest) => request<Warehouse>(`/warehouses/${id}`, { method: 'PUT', body }),
+  remove: (id: number) => request<void>(`/warehouses/${id}`, { method: 'DELETE' }),
+}
+
+export const inventoryApi = {
+  stock: (query: StockQuery) => request<Page<ProductStock>>('/inventory/stock', { query: { ...query } }),
+  movements: (query: MovementQuery) => request<Page<Movement>>('/inventory/movements', { query: { ...query } }),
+  register: (body: MovementRequest) => request<Movement[]>('/inventory/movements', { method: 'POST', body }),
+  summary: () => request<InventorySummary>('/inventory/summary'),
 }

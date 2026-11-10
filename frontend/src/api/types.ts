@@ -43,6 +43,8 @@ export type PermissionValue =
   | 'users:write'
   | 'roles:read'
   | 'roles:write'
+  | 'inventory:read'
+  | 'inventory:write'
 
 export interface Me {
   id: number
@@ -206,4 +208,91 @@ export interface SupplierQuery extends PageQuery {
 
 export interface Meta {
   currency: string
+}
+
+// --- Inventario ---
+
+export interface Warehouse {
+  id: number
+  code: string
+  name: string
+  address?: string
+  active: boolean
+  audit: AuditInfo
+}
+
+export interface WarehouseRequest {
+  code: string
+  name: string
+  address?: string | null
+  active?: boolean
+}
+
+export interface WarehouseRef {
+  id: number
+  code: string
+  name: string
+}
+
+export interface StockProductRef {
+  id: number
+  sku: string
+  name: string
+  unitCode: string
+  unitDecimals: number
+}
+
+export type MovementType = 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER_OUT' | 'TRANSFER_IN'
+export type MovementKind = 'IN' | 'OUT' | 'ADJUSTMENT' | 'TRANSFER'
+
+export interface MovementRequest {
+  type: MovementKind
+  productId: number
+  warehouseId: number
+  targetWarehouseId?: number | null
+  /** En ADJUSTMENT es el saldo contado; en el resto, la cantidad (> 0). */
+  quantity: number
+  reason?: string | null
+  reference?: string | null
+}
+
+export interface Movement {
+  id: number
+  type: MovementType
+  product: StockProductRef
+  warehouse: WarehouseRef
+  quantity: number
+  balanceAfter: number
+  reason?: string
+  reference?: string
+  transferGroup?: string
+  createdAt: string
+  createdBy?: string
+}
+
+export interface MovementQuery extends PageQuery {
+  productId?: number
+  warehouseId?: number
+  type?: MovementType
+}
+
+export interface ProductStock {
+  product: StockProductRef
+  minStock: number
+  total: number
+  low: boolean
+  levels: { warehouse: WarehouseRef; quantity: number }[]
+}
+
+export interface StockQuery extends PageQuery {
+  q?: string
+  categoryId?: number
+  lowOnly?: boolean
+}
+
+export interface InventorySummary {
+  inventoryValue: number
+  lowStockProducts: number
+  movementsLast7Days: number
+  activeWarehouses: number
 }
