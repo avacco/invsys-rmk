@@ -1,0 +1,39 @@
+# Código viejo de referencia: nunca entra al repo
+/legacy/
+
+# Secretos y claves
+.env
+.env.*
+!.env.example
+!.env.demo
+*.pem
+*.key
+*.p12
+*.jks
+
+# Node / frontend
+node_modules/
+dist/
+dist-*/
+coverage/
+*.local
+playwright-report/
+test-results/
+
+# Java / backend
+target/
+build/
+.mvn/wrapper/maven-wrapper.jar
+*.class
+
+# Logs
+*.log
+logs/
+
+# IDE / SO
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
