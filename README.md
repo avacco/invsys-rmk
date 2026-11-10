@@ -129,7 +129,7 @@ cd frontend && npm run test:e2e      # E2E en un navegador real, contra la demo
 ```
 
 - **Backend (35):** autenticación y rotación de tokens, permisos, CRUD con validaciones, movimientos de stock (incluida una prueba de 10 salidas simultáneas sobre un saldo de 5), auditoría, reportes y mensajes en dos idiomas.
-- **Frontend (36):** cliente de la API, formularios, reglas del inventario y un test que falla si queda texto de la interfaz sin traducir.
+- **Frontend (37):** cliente de la API, formularios, reglas del inventario y un test que falla si queda texto de la interfaz sin traducir.
 - **E2E (8):** inicio y cierre de sesión, el flujo completo de crear un producto y darle stock, límites de permisos, idioma, modo oscuro y la demo.
 
 El CI corre las tres suites en cada push. Las capturas de este README se regeneran con `npm run screenshots`.

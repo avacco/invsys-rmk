@@ -23,4 +23,12 @@ describe('productSchema', () => {
     expect(result.success).toBe(false)
     expect(result.error?.issues[0].path).toEqual(['salePrice'])
   })
+
+  it('muestra mensajes propios para campos numéricos vacíos o fuera de rango', () => {
+    const empty = productSchema.safeParse({ ...valid, costPrice: Number.NaN, unitId: Number.NaN })
+    const messages = Object.fromEntries((empty.error?.issues ?? []).map((i) => [i.path[0], i.message]))
+    expect(messages.costPrice).toBe('Ingresa un número')
+    expect(messages.unitId).toBe('Elige una unidad')
+    expect(productSchema.safeParse({ ...valid, unitId: 0 }).error?.issues[0].message).toBe('Elige una unidad')
+  })
 })

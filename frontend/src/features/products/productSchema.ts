@@ -3,7 +3,7 @@ import type { Product, ProductRequest } from '@/api/types'
 import { tk } from '@/i18n'
 
 const money = z
-  .number({ invalid_type_error: tk('Ingresa un número') })
+  .number({ error: tk('Ingresa un número') })
   .min(0, tk('No puede ser negativo'))
   .max(999_999_999_999, tk('Demasiado grande'))
   .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, tk('Máximo 2 decimales'))
@@ -21,11 +21,11 @@ export const productSchema = z
     name: z.string().trim().min(1, tk('El nombre es obligatorio')).max(150, tk('Máximo 150 caracteres')),
     description: z.string().max(4000, tk('Máximo 4000 caracteres')),
     categoryId: optionalId,
-    unitId: z.number({ invalid_type_error: tk('Elige una unidad') }).int().positive('Elige una unidad'),
+    unitId: z.number({ error: tk('Elige una unidad') }).int().positive('Elige una unidad'),
     supplierId: optionalId,
     costPrice: money,
     salePrice: money,
-    minStock: z.number({ invalid_type_error: tk('Ingresa un número') }).min(0, tk('No puede ser negativo')),
+    minStock: z.number({ error: tk('Ingresa un número') }).min(0, tk('No puede ser negativo')),
     status: z.enum(['ACTIVE', 'INACTIVE']),
   })
   .refine((p) => p.salePrice >= p.costPrice || p.salePrice === 0, {

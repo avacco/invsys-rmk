@@ -17,8 +17,8 @@ import { tk } from '@/i18n'
 
 const base = {
   displayName: z.string().trim().min(1, tk('El nombre es obligatorio')).max(100),
-  email: z.union([z.literal(''), z.string().trim().email(tk('Email inválido')).max(255)]),
-  roleId: z.number({ invalid_type_error: tk('Elige un rol') }).int().positive('Elige un rol'),
+  email: z.union([z.literal(''), z.string().trim().pipe(z.email(tk('Email inválido')).max(255))]),
+  roleId: z.number({ error: tk('Elige un rol') }).int().positive('Elige un rol'),
   enabled: z.boolean(),
 }
 const createSchema = z.object({

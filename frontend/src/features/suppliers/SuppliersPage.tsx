@@ -18,7 +18,7 @@ import { tk } from '@/i18n'
 const schema = z.object({
   name: z.string().trim().min(1, tk('El nombre es obligatorio')).max(150),
   taxId: z.string().trim().max(50),
-  email: z.union([z.literal(''), z.string().trim().email(tk('Email inválido')).max(255)]),
+  email: z.union([z.literal(''), z.string().trim().pipe(z.email(tk('Email inválido')).max(255))]),
   phone: z.string().trim().max(50),
   address: z.string().trim().max(255),
   notes: z.string().max(2000),

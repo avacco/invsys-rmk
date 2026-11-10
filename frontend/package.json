@@ -37,7 +37,7 @@
     "react-router": "^7.18.5",
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.5",
-    "zod": "^3.25.76",
+    "zod": "^4.6.7",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
@@ -60,6 +60,11 @@
     "typescript": "~5.8",
     "typescript-eslint": "^8.72.2",
     "vite": "^6.4.6",
-    "vitest": "^3.2.7"
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.6"
+    }
   }
 }

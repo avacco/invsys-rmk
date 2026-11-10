@@ -18,10 +18,10 @@ const KINDS: MovementKind[] = ['IN', 'OUT', 'TRANSFER', 'ADJUSTMENT']
 const schema = z
   .object({
     type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER']),
-    productId: z.number({ invalid_type_error: tk('Elige un producto') }).int().positive('Elige un producto'),
-    warehouseId: z.number({ invalid_type_error: tk('Elige un almacén') }).int().positive('Elige un almacén'),
+    productId: z.number({ error: tk('Elige un producto') }).int().positive('Elige un producto'),
+    warehouseId: z.number({ error: tk('Elige un almacén') }).int().positive('Elige un almacén'),
     targetWarehouseId: z.number().int().positive().nullable(),
-    quantity: z.number({ invalid_type_error: tk('Ingresa una cantidad') }).min(0, tk('No puede ser negativa')),
+    quantity: z.number({ error: tk('Ingresa una cantidad') }).min(0, tk('No puede ser negativa')),
     reason: z.string().max(255),
     reference: z.string().max(100),
   })
