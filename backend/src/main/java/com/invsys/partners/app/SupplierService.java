@@ -1,0 +1,79 @@
+package com.invsys.partners.app;
+
+import com.invsys.partners.app.SupplierDtos.SupplierRequest;
+import com.invsys.partners.app.SupplierDtos.SupplierResponse;
+import com.invsys.partners.domain.Supplier;
+import com.invsys.partners.domain.SupplierRepository;
+import com.invsys.shared.web.ConflictException;
+import com.invsys.shared.web.NotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional
+public class SupplierService {
+
+    private final SupplierRepository suppliers;
+    private final SupplierUsage usage;
+
+    public SupplierService(SupplierRepository suppliers, SupplierUsage usage) {
+        this.suppliers = suppliers;
+        this.usage = usage;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SupplierResponse> list(String q, Boolean active, Pageable pageable) {
+        Specification<Supplier> spec = (root, query, cb) -> cb.conjunction();
+        if (q != null && !q.isBlank()) {
+            String like = "%" + q.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("name")), like),
+                    cb.like(cb.lower(cb.coalesce(root.<String>get("taxId"), "")), like)));
+        }
+        if (active != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        return suppliers.findAll(spec, pageable).map(SupplierResponse::of);
+    }
+
+    @Transactional(readOnly = true)
+    public SupplierResponse get(Long id) {
+        return SupplierResponse.of(find(id));
+    }
+
+    public SupplierResponse create(SupplierRequest request) {
+        Supplier supplier = new Supplier(request.name().trim());
+        apply(supplier, request);
+        return SupplierResponse.of(suppliers.save(supplier));
+    }
+
+    public SupplierResponse update(Long id, SupplierRequest request) {
+        Supplier supplier = find(id);
+        apply(supplier, request);
+        return SupplierResponse.of(supplier);
+    }
+
+    public void delete(Long id) {
+        Supplier supplier = find(id);
+        if (usage.isInUse(id)) {
+            throw new ConflictException("El proveedor tiene productos asociados; desactivalo en lugar de eliminarlo");
+        }
+        suppliers.delete(supplier);
+    }
+
+    private Supplier find(Long id) {
+        return suppliers.findById(id).orElseThrow(() -> new NotFoundException("Proveedor", id));
+    }
+
+    private static void apply(Supplier s, SupplierRequest r) {
+        s.update(r.name().trim(), clean(r.taxId()), clean(r.email()), clean(r.phone()), clean(r.address()),
+                clean(r.notes()), r.active() == null || r.active());
+    }
+
+    private static String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

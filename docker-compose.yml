@@ -1,5 +1,5 @@
-# Entorno de desarrollo local. Por ahora solo la base de datos;
-# backend y frontend se suman en la fase 1.
+# Entorno local completo: PostgreSQL + API (perfil dev, con datos de demo).
+# El frontend se levanta aparte con `npm run dev` (redirige /api a localhost:8080).
 services:
   db:
     image: postgres:17-alpine
@@ -17,5 +17,21 @@ services:
       timeout: 3s
       retries: 10
 
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-invsys}
+      DB_USER: ${POSTGRES_USER:-invsys}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-invsys_dev}
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/data/uploads
+
 volumes:
   db-data:
+  uploads:

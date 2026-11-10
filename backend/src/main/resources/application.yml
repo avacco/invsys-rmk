@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: invsys
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/invsys}
+    username: ${DB_USER:invsys}
+    password: ${DB_PASSWORD:invsys_dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  jackson:
+    default-property-inclusion: non_null
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+
+springdoc:
+  api-docs:
+    path: /api/docs
+  swagger-ui:
+    path: /api/docs/ui
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+invsys:
+  currency: ${INVSYS_CURRENCY:USD}
+  security:
+    # Clave HMAC para firmar los JWT. Mínimo 32 caracteres. Obligatoria fuera del perfil dev.
+    jwt-secret: ${JWT_SECRET:}
+    access-token-ttl: ${JWT_ACCESS_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TTL:7d}
+    cookie-secure: ${COOKIE_SECURE:true}
+    allowed-origins: ${CORS_ORIGINS:}
+  bootstrap:
+    # Si la base no tiene usuarios, crea "admin" con esta contraseña al iniciar.
+    admin-password: ${ADMIN_PASSWORD:}
+  storage:
+    directory: ${STORAGE_DIR:./data/uploads}
+    public-path: /files

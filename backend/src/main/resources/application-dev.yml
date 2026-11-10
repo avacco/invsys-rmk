@@ -1,0 +1,12 @@
+# Perfil de desarrollo local: datos de demo y valores por defecto cómodos.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+invsys:
+  security:
+    jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    cookie-secure: false
+    allowed-origins: http://localhost:3000
+  bootstrap:
+    admin-password: ${ADMIN_PASSWORD:admin1234}

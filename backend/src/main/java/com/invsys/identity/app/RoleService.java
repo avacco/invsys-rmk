@@ -1,0 +1,88 @@
+package com.invsys.identity.app;
+
+import com.invsys.identity.app.IdentityDtos.PermissionResponse;
+import com.invsys.identity.app.IdentityDtos.RoleRequest;
+import com.invsys.identity.app.IdentityDtos.RoleResponse;
+import com.invsys.identity.domain.Permission;
+import com.invsys.identity.domain.Role;
+import com.invsys.identity.domain.RoleRepository;
+import com.invsys.identity.domain.UserRepository;
+import com.invsys.shared.web.BadRequestException;
+import com.invsys.shared.web.ConflictException;
+import com.invsys.shared.web.NotFoundException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional
+public class RoleService {
+
+    private final RoleRepository roles;
+    private final UserRepository users;
+
+    public RoleService(RoleRepository roles, UserRepository users) {
+        this.roles = roles;
+        this.users = users;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoleResponse> list() {
+        return roles.findAll(Sort.by("name")).stream().map(RoleResponse::of).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public RoleResponse get(Long id) {
+        return RoleResponse.of(find(id));
+    }
+
+    public RoleResponse create(RoleRequest request) {
+        if (roles.existsByNameIgnoreCase(request.name())) {
+            throw new ConflictException("Ya existe un rol con ese nombre");
+        }
+        validatePermissions(request.permissions());
+        return RoleResponse.of(roles.save(new Role(request.name(), request.description(), request.permissions())));
+    }
+
+    public RoleResponse update(Long id, RoleRequest request) {
+        Role role = find(id);
+        if (role.isSystem()) {
+            throw new BadRequestException("Los roles de sistema no se pueden modificar");
+        }
+        if (roles.existsByNameIgnoreCaseAndIdNot(request.name(), id)) {
+            throw new ConflictException("Ya existe un rol con ese nombre");
+        }
+        validatePermissions(request.permissions());
+        role.update(request.name(), request.description(), request.permissions());
+        return RoleResponse.of(role);
+    }
+
+    public void delete(Long id) {
+        Role role = find(id);
+        if (role.isSystem()) {
+            throw new BadRequestException("Los roles de sistema no se pueden eliminar");
+        }
+        if (users.countByRoleId(id) > 0) {
+            throw new ConflictException("El rol tiene usuarios asignados");
+        }
+        roles.delete(role);
+    }
+
+    public List<PermissionResponse> permissions() {
+        return Arrays.stream(Permission.values()).map(p -> new PermissionResponse(p.value(), p.resource())).toList();
+    }
+
+    private Role find(Long id) {
+        return roles.findById(id).orElseThrow(() -> new NotFoundException("Rol", id));
+    }
+
+    private static void validatePermissions(Set<String> permissions) {
+        List<String> unknown = permissions.stream().filter(p -> Permission.fromValue(p).isEmpty()).sorted().toList();
+        if (!unknown.isEmpty()) {
+            throw new BadRequestException("Permisos desconocidos: " + String.join(", ", unknown));
+        }
+    }
+}

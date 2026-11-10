@@ -1,47 +1,104 @@
 # Invsys
 
-Sistema de gestión de inventario: catálogo de productos, stock por almacén basado en movimientos, proveedores, usuarios con roles y permisos, auditoría y dashboard.
+Sistema de gestión de inventario: catálogo de productos, proveedores, usuarios con roles y permisos, y (próximamente) stock por almacén basado en movimientos.
 
-Proyecto de portfolio. Es una **base general y neutral respecto del país**: no implementa reglas fiscales ni regulatorias, pero está diseñado para que puedan agregarse como módulos.
+Proyecto de portfolio. Es una **base general y neutral respecto del país**: no implementa reglas fiscales ni regulatorias, pero está diseñado para que puedan agregarse como módulos (ver [ADR 0001](docs/adr/0001-monorepo-y-monolito-modular.md)).
 
-> 🚧 **En reconstrucción.** Ver la [hoja de ruta](#hoja-de-ruta).
+## Funcionalidades
+
+- **Sesión segura:** JWT en cookies httpOnly, refresh tokens rotativos con detección de reutilización ([ADR 0004](docs/adr/0004-sesion-con-cookies-httponly.md)).
+- **Roles y permisos** `recurso:operación`, aplicados en cada endpoint y reflejados en la interfaz.
+- **Productos:** SKU, categoría, unidad de medida, proveedor, costo, precio de venta, stock mínimo, imagen. Búsqueda, filtros, orden, paginación, vista de tarjetas o tabla y exportación CSV.
+- **Categorías, unidades de medida y proveedores** con validación de referencias (no se borra lo que está en uso).
+- **Usuarios y roles** administrables desde la interfaz.
+- **Auditoría básica:** cada registro guarda quién y cuándo lo creó y lo modificó, tomado de la sesión.
+- **Modo demo sin backend:** el frontend se publica como sitio estático con una API simulada ([ADR 0002](docs/adr/0002-demo-frontend-sin-backend.md)).
+
+## Stack
+
+| Capa | Tecnología |
+|---|---|
+| Backend | Java 21, Spring Boot 3.5, Spring Security (resource server JWT), Spring Data JPA, Flyway, springdoc-openapi |
+| Base de datos | PostgreSQL 17 |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, React Hook Form + Zod |
+| Demo | MSW (Mock Service Worker) |
+| Tests | JUnit 5 + Testcontainers, Vitest + Testing Library |
+| CI/CD | GitHub Actions (tests + publicación de la demo en GitHub Pages) |
 
 ## Estructura
 
 ```
 invsys/
-├── backend/            # API REST — Spring Boot (fase 1)
-├── frontend/           # SPA — React + TypeScript + Vite (fase 1)
-├── docs/adr/           # Registro de decisiones de arquitectura
-└── docker-compose.yml  # Entorno local (PostgreSQL)
+├── backend/             API REST (Spring Boot)
+│   └── src/main/java/com/invsys/
+│       ├── identity/    usuarios, roles, permisos, autenticación
+│       ├── catalog/     productos, categorías, unidades
+│       ├── partners/    proveedores
+│       ├── storage/     almacenamiento de imágenes (intercambiable)
+│       └── shared/      auditoría, errores, paginación
+├── frontend/            SPA (React)
+│   └── src/
+│       ├── api/         cliente HTTP y tipos del contrato
+│       ├── features/    una carpeta por pantalla
+│       └── mocks/       backend simulado para la demo y los tests
+├── docs/adr/            decisiones de arquitectura
+└── docker-compose.yml   PostgreSQL + API para desarrollo
 ```
 
-## Stack previsto
+## Cómo correrlo
 
-| Capa | Tecnología |
-|---|---|
-| Backend | Java 21 LTS, Spring Boot, Spring Security, Spring Data JPA, Flyway, springdoc-openapi |
-| Base de datos | PostgreSQL |
-| Frontend | React, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router |
-| Demo sin backend | MSW (Mock Service Worker) |
-| Tests | JUnit 5 + Testcontainers, Vitest, Playwright |
-| CI | GitHub Actions |
-
-## Desarrollo local
+### Solo la demo (sin backend)
 
 ```bash
-cp .env.example .env
-docker compose up -d db
+cd frontend
+npm ci
+npm run dev:demo        # http://localhost:3000
 ```
 
-## Demo
+### Completo (con backend)
 
-El frontend se puede compilar en **modo demo**: un backend simulado (MSW) responde en el navegador con datos ficticios, así que se puede publicar como sitio estático sin desplegar la API. Ver [ADR 0002](docs/adr/0002-demo-frontend-sin-backend.md).
+Requiere Docker y Node 20+.
+
+```bash
+docker compose up --build -d    # PostgreSQL + API en http://localhost:8080
+cd frontend
+npm ci
+npm run dev                     # http://localhost:3000 (redirige /api al backend)
+```
+
+Usuarios de prueba (perfil `dev` y demo):
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `admin` | `admin1234` | ADMIN — acceso total |
+| `manager` | `manager1234` | MANAGER — catálogo y proveedores |
+| `viewer` | `viewer1234` | VIEWER — solo lectura |
+
+Documentación interactiva de la API: http://localhost:8080/api/docs/ui
+
+### Variables de entorno del backend (producción)
+
+| Variable | Descripción |
+|---|---|
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | Conexión a PostgreSQL |
+| `JWT_SECRET` | Clave para firmar los JWT (mínimo 32 caracteres) |
+| `ADMIN_PASSWORD` | Contraseña del usuario `admin` que se crea si la base está vacía |
+| `CORS_ORIGINS` | Orígenes permitidos, separados por coma (si el frontend está en otro dominio) |
+| `COOKIE_SECURE` | `true` (por defecto) exige HTTPS para las cookies |
+| `INVSYS_CURRENCY` | Código ISO 4217 de la moneda (por defecto `USD`) |
+| `STORAGE_DIR` | Carpeta donde se guardan las imágenes |
+
+## Tests
+
+```bash
+cd backend && ./mvnw verify      # requiere Docker (Testcontainers)
+cd frontend && npm test
+```
 
 ## Hoja de ruta
 
 - [x] **Fase 0 — Base:** monorepo, entorno local, ADRs
-- [ ] **Fase 1 — Identity y catálogo:** auth con cookies httpOnly, permisos, CRUD de catálogo, cliente TS generado desde OpenAPI, CI
-- [ ] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo
-- [ ] **Fase 3 — Visibilidad:** dashboard y auditoría reales, usuarios y proveedores, i18n (es/en)
-- [ ] **Fase 4 — Vidriera:** demo publicada, capturas, documentación final
+- [x] **Fase 1 — Identity y catálogo:** autenticación, permisos, catálogo, proveedores, usuarios, demo, CI
+- [ ] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo ([ADR 0003](docs/adr/0003-stock-basado-en-movimientos.md))
+- [ ] **Fase 3 — Visibilidad:** dashboard y auditoría completos, i18n (es/en)
+- [ ] **Fase 4 — Vidriera:** tests E2E, capturas, documentación final

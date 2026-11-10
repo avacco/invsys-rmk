@@ -1,0 +1,8 @@
+invsys:
+  security:
+    jwt-secret: test-secret-0123456789abcdef0123456789abcdef
+    cookie-secure: false
+  bootstrap:
+    admin-password: admin1234
+  storage:
+    directory: ${java.io.tmpdir}/invsys-test-uploads
