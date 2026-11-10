@@ -1,10 +1,12 @@
 name: Demo en GitHub Pages
 
 # Publica el frontend en modo demo (backend simulado con MSW). No necesita servidor.
+# Se ejecuta solo a mano (Actions → "Demo en GitHub Pages" → Run workflow).
+# Para publicar automáticamente en cada push a main, agregar:
+#   push:
+#     branches: [main]
+#     paths: ['frontend/**']
 on:
-  push:
-    branches: [main]
-    paths: ['frontend/**', '.github/workflows/demo.yml']
   workflow_dispatch:
 
 permissions:
