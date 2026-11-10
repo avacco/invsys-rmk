@@ -13,6 +13,8 @@ import com.invsys.shared.web.NotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +27,10 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
 
-    public UserService(UserRepository users, RoleRepository roles, PasswordEncoder passwordEncoder, AuthService authService) {
+    private final AuditLog audit;
+
+    public UserService(UserRepository users, RoleRepository roles, PasswordEncoder passwordEncoder, AuthService authService, AuditLog audit) {
+        this.audit = audit;
         this.users = users;
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
@@ -56,7 +61,9 @@ public class UserService {
         if (Boolean.FALSE.equals(request.enabled())) {
             user.update(user.getDisplayName(), user.getEmail(), user.getRole(), false);
         }
-        return UserResponse.of(users.save(user));
+        User saved = users.save(user);
+        audit.record(AuditAction.CREATE, "user", saved.getId(), saved.getUsername() + " · " + saved.getRole().getName());
+        return UserResponse.of(saved);
     }
 
     public UserResponse update(Long id, UpdateUserRequest request, String currentUsername) {
@@ -74,6 +81,9 @@ public class UserService {
         if (!request.enabled()) {
             authService.revokeAllSessions(user.getId());
         }
+        audit.record(AuditAction.UPDATE, "user", id, user.getUsername() + " · " + role.getName()
+                + (request.enabled() ? "" : " · disabled")
+                + (request.password() != null && !request.password().isBlank() ? " · password changed" : ""));
         return UserResponse.of(user);
     }
 
@@ -83,6 +93,7 @@ public class UserService {
             throw new BadRequestException("No podés eliminar tu propio usuario");
         }
         users.delete(user);
+        audit.record(AuditAction.DELETE, "user", id, user.getUsername());
     }
 
     private User find(Long id) {

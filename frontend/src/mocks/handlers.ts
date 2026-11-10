@@ -1,6 +1,7 @@
 import { http, HttpResponse, type PathParams } from 'msw'
 import { API_BASE } from '@/api/client'
 import type {
+  ActivityDay, AuditAction, AuditEntry, TopProduct, ValuationRow,
   InventorySummary, Movement, MovementRequest, MovementType, ProductStock, Warehouse, WarehouseRequest,
   AuditInfo, CategoryRequest, CreateUserRequest, Me, PermissionInfo, PermissionValue, Product, ProductRequest, Role,
   RoleRequest, Supplier, SupplierRequest, UnitRequest, UpdateUserRequest, User,
@@ -52,6 +53,52 @@ function publicUser(u: DemoUser): User {
   return rest
 }
 
+function log(actor: string, action: AuditAction, entityType: string | undefined, entityId: number | string | undefined, summary?: string) {
+  const entry: AuditEntry = {
+    id: nextId(), occurredAt: new Date().toISOString(), actor, action, entityType,
+    entityId: entityId === undefined ? undefined : String(entityId), summary,
+  }
+  getDb().audit.push(entry)
+}
+
+const RESOURCE_TYPES: Record<string, string> = {
+  products: 'product', categories: 'category', units: 'unit', suppliers: 'supplier',
+  users: 'user', roles: 'role', warehouses: 'warehouse',
+}
+
+/** Mismo descriptor que usa el backend real para cada tipo de entidad. */
+function describe(type: string, id: number): string | undefined {
+  const db = getDb()
+  switch (type) {
+    case 'product': { const p = db.products.find((x) => x.id === id); return p && `${p.name} (${p.sku})` }
+    case 'category': return db.categories.find((x) => x.id === id)?.name
+    case 'unit': { const u = db.units.find((x) => x.id === id); return u && `${u.name} (${u.code})` }
+    case 'supplier': return db.suppliers.find((x) => x.id === id)?.name
+    case 'warehouse': { const w = db.warehouses.find((x) => x.id === id); return w && `${w.name} (${w.code})` }
+    case 'user': { const u = db.users.find((x) => x.id === id); return u && `${u.username} · ${u.role.name}` }
+    case 'role': { const r = db.roles.find((x) => x.id === id); return r && `${r.name} · ${r.permissions.join(', ')}` }
+    default: return undefined
+  }
+}
+
+/** Audita automáticamente las altas, cambios y bajas de los CRUD (como hacen los servicios del backend). */
+async function autoAudit(request: Request, params: PathParams, response: Response, user: DemoUser, before?: string) {
+  if (request.method === 'GET' || !response.ok) return
+  const segments = new URL(request.url).pathname.split('/')
+  const resourceIndex = segments.findIndex((s) => s in RESOURCE_TYPES)
+  if (resourceIndex < 0) return
+  const type = RESOURCE_TYPES[segments[resourceIndex]]
+  const isImage = segments.includes('image')
+  let id = params.id ? Number(params.id) : undefined
+  if (id === undefined) {
+    try { id = ((await response.clone().json()) as { id?: number }).id } catch { /* sin cuerpo */ }
+  }
+  if (id === undefined) return
+  const action: AuditAction = isImage ? 'UPDATE' : request.method === 'POST' ? 'CREATE' : request.method === 'PUT' ? 'UPDATE' : 'DELETE'
+  const summary = action === 'DELETE' ? before : describe(type, id)
+  log(user.username, action, type, id, isImage && summary ? `${summary} · ${request.method === 'DELETE' ? 'image removed' : 'image'}` : summary)
+}
+
 type Handler = (args: { request: Request; params: PathParams; user: DemoUser }) => Promise<Response> | Response
 
 /** Envuelve un handler: exige sesión, verifica permiso y traduce HttpError a ProblemDetail. */
@@ -64,7 +111,11 @@ function guarded(permission: PermissionValue | PermissionValue[] | null, handler
       return problem(403, 'No tenés permiso para esta operación')
     }
     try {
+      const segments = new URL(request.url).pathname.split('/')
+      const resource = segments.find((s) => s in RESOURCE_TYPES)
+      const before = request.method === 'DELETE' && resource && params.id ? describe(RESOURCE_TYPES[resource], Number(params.id)) : undefined
       const response = await handler({ request, params, user })
+      await autoAudit(request, params, response, user, before)
       persist()
       return response
     } catch (e) {
@@ -95,6 +146,7 @@ function requireFields(fields: Record<string, string | false>) {
 const SORT_GETTERS: Record<string, (x: never) => unknown> = {
   updatedAt: (x: { audit: { updatedAt: string } }) => x.audit.updatedAt,
   createdAt: (x: { audit?: { createdAt: string }; createdAt?: string }) => x.createdAt ?? x.audit?.createdAt,
+  occurredAt: (x: { occurredAt: string }) => x.occurredAt,
 }
 
 function paginate<T>(items: T[], request: Request, defaultSort: string) {
@@ -187,8 +239,14 @@ const baseHandlers = [
   http.post(url('/auth/login'), async ({ request }) => {
     const { username, password } = (await request.json()) as { username?: string; password?: string }
     const user = getDb().users.find((u) => u.username === username)
-    if (!user || !user.enabled || user.password !== password) return problem(401, 'Usuario o contraseña incorrectos')
+    if (!user || !user.enabled || user.password !== password) {
+      log(username ?? '', 'LOGIN_FAILED', 'user', undefined, username)
+      persist()
+      return problem(401, 'Usuario o contraseña incorrectos')
+    }
     sessionStorage.setItem(SESSION_KEY, user.username)
+    log(user.username, 'LOGIN', 'user', user.id, user.username)
+    persist()
     return HttpResponse.json(toMe(user))
   }),
 
@@ -198,6 +256,11 @@ const baseHandlers = [
   }),
 
   http.post(url('/auth/logout'), () => {
+    const user = sessionUser()
+    if (user) {
+      log(user.username, 'LOGOUT', 'user', user.id, user.username)
+      persist()
+    }
     sessionStorage.removeItem(SESSION_KEY)
     return new HttpResponse(null, { status: 204 })
   }),
@@ -619,8 +682,104 @@ export const inventoryHandlers = [
     return paginate(rows, request, 'createdAt,desc')
   })),
 
-  http.post(url('/inventory/movements'), guarded('inventory:write', async ({ request, user }) =>
-    HttpResponse.json(registerMovement((await request.json()) as MovementRequest, user.username), { status: 201 }))),
+  http.post(url('/inventory/movements'), guarded('inventory:write', async ({ request, user }) => {
+    const body = (await request.json()) as MovementRequest
+    const result = registerMovement(body, user.username)
+    const first = result[0]
+    const transfer = result.length > 1
+    const qty = transfer ? -first.quantity : first.quantity
+    const where = transfer ? `${first.warehouse.name} → ${result[1].warehouse.name}` : first.warehouse.name
+    log(user.username, 'STOCK_MOVEMENT', 'product', first.product.id,
+      `${transfer ? 'TRANSFER' : first.type} · ${qty} ${first.product.unitCode} · ${first.product.name} (${first.product.sku}) · ${where}`)
+    return HttpResponse.json(result, { status: 201 })
+  })),
+
+  // Auditoría
+  http.get(url('/audit'), guarded('audit:read', ({ request }) => {
+    const p = new URL(request.url).searchParams
+    const q = p.get('q')?.trim().toLowerCase()
+    const actor = p.get('actor')?.trim().toLowerCase()
+    const from = p.get('from') ? Date.parse(p.get('from')!) : undefined
+    const to = p.get('to') ? Date.parse(p.get('to')!) : undefined
+    const rows = getDb().audit.filter((e) =>
+      (!actor || e.actor?.toLowerCase() === actor) &&
+      (!p.get('action') || e.action === p.get('action')) &&
+      (!p.get('entityType') || e.entityType === p.get('entityType')) &&
+      (!p.get('entityId') || e.entityId === p.get('entityId')) &&
+      (!q || (e.summary ?? '').toLowerCase().includes(q)) &&
+      (from === undefined || Date.parse(e.occurredAt) >= from) &&
+      (to === undefined || Date.parse(e.occurredAt) < to))
+    return paginate(rows, request, 'occurredAt,desc')
+  })),
+
+  // Reportes
+  http.get(url('/reports/valuation'), guarded('inventory:read', ({ request }) => {
+    const db = getDb()
+    const byWarehouse = new URL(request.url).searchParams.get('groupBy') === 'WAREHOUSE'
+    const groups = new Map<string, ValuationRow & { productIds: Set<number> }>()
+    for (const row of db.stock) {
+      if (row.quantity <= 0) continue
+      const product = db.products.find((p) => p.id === row.productId)
+      if (!product) continue
+      const key = byWarehouse ? { id: row.warehouseId, name: db.warehouses.find((w) => w.id === row.warehouseId)?.name ?? null }
+        : { id: product.category?.id ?? null, name: product.category?.name ?? null }
+      const g = groups.get(String(key.id)) ?? { ...key, products: 0, costValue: 0, saleValue: 0, productIds: new Set<number>() }
+      g.productIds.add(product.id)
+      g.costValue += row.quantity * product.costPrice
+      g.saleValue += row.quantity * product.salePrice
+      groups.set(String(key.id), g)
+    }
+    const money = (n: number) => Math.round(n * 100) / 100
+    return HttpResponse.json([...groups.values()]
+      .map(({ productIds, ...g }) => ({ ...g, products: productIds.size, costValue: money(g.costValue), saleValue: money(g.saleValue) }))
+      .sort((a, b) => b.costValue - a.costValue))
+  })),
+
+  http.get(url('/reports/activity'), guarded('inventory:read', ({ request }) => {
+    const p = new URL(request.url).searchParams
+    const days = Math.min(366, Math.max(1, Number(p.get('days') ?? 30)))
+    const tz = p.get('tz') || 'UTC'
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }) } catch { return problem(400, `Zona horaria inválida: ${tz}`) }
+    const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d)
+    const series: ActivityDay[] = []
+    for (let i = days - 1; i >= 0; i--) {
+      series.push({ date: localDate(new Date(Date.now() - i * 86_400_000)), inValue: 0, outValue: 0, adjustmentValue: 0, movements: 0 })
+    }
+    const byDate = new Map(series.map((d) => [d.date, d]))
+    const db = getDb()
+    for (const m of db.movements) {
+      const day = byDate.get(localDate(new Date(m.createdAt)))
+      if (!day) continue
+      const cost = db.products.find((x) => x.id === m.product.id)?.costPrice ?? 0
+      day.movements++
+      if (m.type === 'IN') day.inValue += m.quantity * cost
+      if (m.type === 'OUT') day.outValue += -m.quantity * cost
+      if (m.type === 'ADJUSTMENT') day.adjustmentValue += m.quantity * cost
+    }
+    return HttpResponse.json(series.map((d) => ({ ...d, inValue: Math.round(d.inValue * 100) / 100,
+      outValue: Math.round(d.outValue * 100) / 100, adjustmentValue: Math.round(d.adjustmentValue * 100) / 100 })))
+  })),
+
+  http.get(url('/reports/top-products'), guarded('inventory:read', ({ request }) => {
+    const p = new URL(request.url).searchParams
+    const since = Date.now() - Math.min(366, Math.max(1, Number(p.get('days') ?? 30))) * 86_400_000
+    const limit = Math.min(50, Math.max(1, Number(p.get('limit') ?? 10)))
+    const db = getDb()
+    const rows = new Map<number, TopProduct>()
+    for (const m of db.movements) {
+      if (m.type !== 'OUT' || Date.parse(m.createdAt) < since) continue
+      const cost = db.products.find((x) => x.id === m.product.id)?.costPrice ?? 0
+      const row = rows.get(m.product.id) ?? { product: m.product, outQuantity: 0, outValue: 0, movements: 0 }
+      row.outQuantity += -m.quantity
+      row.outValue += -m.quantity * cost
+      row.movements++
+      rows.set(m.product.id, row)
+    }
+    return HttpResponse.json([...rows.values()]
+      .map((r) => ({ ...r, outQuantity: Math.round(r.outQuantity * 1000) / 1000, outValue: Math.round(r.outValue * 100) / 100 }))
+      .sort((a, b) => b.outValue - a.outValue || a.product.name.localeCompare(b.product.name))
+      .slice(0, limit))
+  })),
 
   http.get(url('/inventory/summary'), guarded('inventory:read', () => {
     const db = getDb()

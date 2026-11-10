@@ -9,6 +9,8 @@ import com.invsys.shared.web.ConflictException;
 import com.invsys.shared.web.NotFoundException;
 import java.util.List;
 import org.springframework.data.domain.Sort;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +21,10 @@ public class CategoryService {
     private final CategoryRepository categories;
     private final ProductRepository products;
 
-    public CategoryService(CategoryRepository categories, ProductRepository products) {
+    private final AuditLog audit;
+
+    public CategoryService(CategoryRepository categories, ProductRepository products, AuditLog audit) {
+        this.audit = audit;
         this.categories = categories;
         this.products = products;
     }
@@ -39,7 +44,9 @@ public class CategoryService {
         if (categories.existsByNameIgnoreCase(name)) {
             throw new ConflictException("Ya existe una categoría con ese nombre");
         }
-        return CategoryResponse.of(categories.save(new Category(name, clean(request.description()))));
+        Category saved = categories.save(new Category(name, clean(request.description())));
+        audit.record(AuditAction.CREATE, "category", saved.getId(), saved.getName());
+        return CategoryResponse.of(saved);
     }
 
     public CategoryResponse update(Long id, CategoryRequest request) {
@@ -49,6 +56,7 @@ public class CategoryService {
             throw new ConflictException("Ya existe una categoría con ese nombre");
         }
         category.update(name, clean(request.description()));
+        audit.record(AuditAction.UPDATE, "category", id, name);
         return CategoryResponse.of(category);
     }
 
@@ -58,6 +66,7 @@ public class CategoryService {
             throw new ConflictException("La categoría tiene productos asociados");
         }
         categories.delete(category);
+        audit.record(AuditAction.DELETE, "category", id, category.getName());
     }
 
     private Category find(Long id) {

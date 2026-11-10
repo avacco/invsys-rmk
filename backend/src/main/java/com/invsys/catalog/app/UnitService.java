@@ -9,6 +9,8 @@ import com.invsys.shared.web.ConflictException;
 import com.invsys.shared.web.NotFoundException;
 import java.util.List;
 import org.springframework.data.domain.Sort;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +21,10 @@ public class UnitService {
     private final UnitRepository units;
     private final ProductRepository products;
 
-    public UnitService(UnitRepository units, ProductRepository products) {
+    private final AuditLog audit;
+
+    public UnitService(UnitRepository units, ProductRepository products, AuditLog audit) {
+        this.audit = audit;
         this.units = units;
         this.products = products;
     }
@@ -34,7 +39,9 @@ public class UnitService {
         if (units.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("Ya existe una unidad con ese código");
         }
-        return UnitResponse.of(units.save(new Unit(code, request.name().trim(), request.decimals())));
+        Unit saved = units.save(new Unit(code, request.name().trim(), request.decimals()));
+        audit.record(AuditAction.CREATE, "unit", saved.getId(), saved.getName() + " (" + code + ")");
+        return UnitResponse.of(saved);
     }
 
     public UnitResponse update(Long id, UnitRequest request) {
@@ -44,6 +51,7 @@ public class UnitService {
             throw new ConflictException("Ya existe una unidad con ese código");
         }
         unit.update(code, request.name().trim(), request.decimals());
+        audit.record(AuditAction.UPDATE, "unit", id, unit.getName() + " (" + code + ")");
         return UnitResponse.of(unit);
     }
 
@@ -53,6 +61,7 @@ public class UnitService {
             throw new ConflictException("La unidad está en uso");
         }
         units.delete(unit);
+        audit.record(AuditAction.DELETE, "unit", id, unit.getName() + " (" + unit.getCode() + ")");
     }
 
     private Unit find(Long id) {

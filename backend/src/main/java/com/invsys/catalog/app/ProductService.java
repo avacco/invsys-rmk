@@ -20,6 +20,8 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,8 +37,11 @@ public class ProductService {
     private final FileStorage storage;
     private final List<ProductUsage> usages;
 
+    private final AuditLog audit;
+
     public ProductService(ProductRepository products, CategoryRepository categories, UnitRepository units,
-                          SupplierRepository suppliers, FileStorage storage, List<ProductUsage> usages) {
+                          SupplierRepository suppliers, FileStorage storage, List<ProductUsage> usages, AuditLog audit) {
+        this.audit = audit;
         this.products = products;
         this.categories = categories;
         this.units = units;
@@ -62,7 +67,9 @@ public class ProductService {
         }
         Product product = new Product(sku);
         apply(product, request);
-        return ProductResponse.of(products.save(product));
+        Product saved = products.save(product);
+        audit.record(AuditAction.CREATE, "product", saved.getId(), describe(saved));
+        return ProductResponse.of(saved);
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
@@ -71,6 +78,7 @@ public class ProductService {
             throw new ConflictException("Ya existe un producto con el SKU " + request.sku().trim());
         }
         apply(product, request);
+        audit.record(AuditAction.UPDATE, "product", id, describe(product));
         return ProductResponse.of(product);
     }
 
@@ -81,6 +89,7 @@ public class ProductService {
         }
         String imageUrl = product.getImageUrl();
         products.delete(product);
+        audit.record(AuditAction.DELETE, "product", id, describe(product));
         products.flush();
         storage.delete(imageUrl);
     }
@@ -90,6 +99,7 @@ public class ProductService {
         String previous = product.getImageUrl();
         product.setImageUrl(storage.storeImage(file, "products"));
         storage.delete(previous);
+        audit.record(AuditAction.UPDATE, "product", id, describe(product) + " · image");
         return ProductResponse.of(product);
     }
 
@@ -97,7 +107,12 @@ public class ProductService {
         Product product = find(id);
         storage.delete(product.getImageUrl());
         product.setImageUrl(null);
+        audit.record(AuditAction.UPDATE, "product", id, describe(product) + " · image removed");
         return ProductResponse.of(product);
+    }
+
+    private static String describe(Product p) {
+        return p.getName() + " (" + p.getSku() + ")";
     }
 
     private Product find(Long id) {

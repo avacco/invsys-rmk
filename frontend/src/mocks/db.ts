@@ -1,4 +1,4 @@
-import type { AuditInfo, Category, Movement, PermissionValue, Product, Role, Supplier, Unit, User, Warehouse } from '@/api/types'
+import type { AuditEntry, AuditInfo, Category, Movement, PermissionValue, Product, Role, Supplier, Unit, User, Warehouse } from '@/api/types'
 
 /**
  * "Base de datos" del modo demo. Vive en memoria y se persiste en localStorage,
@@ -21,6 +21,7 @@ export interface DemoDb {
   /** Saldos por producto y almacén. */
   stock: StockRow[]
   movements: Movement[]
+  audit: AuditEntry[]
 }
 
 export interface StockRow {
@@ -31,11 +32,11 @@ export interface StockRow {
 
 const STORAGE_KEY = 'invsys-demo-db'
 const VERSION_KEY = 'invsys-demo-db-version'
-const VERSION = '2'
+const VERSION = '4'
 
 export const ALL_PERMISSIONS: PermissionValue[] = [
   'catalog:read', 'catalog:write', 'partners:read', 'partners:write',
-  'users:read', 'users:write', 'roles:read', 'roles:write', 'inventory:read', 'inventory:write',
+  'users:read', 'users:write', 'roles:read', 'roles:write', 'inventory:read', 'inventory:write', 'audit:read',
 ]
 
 export function audit(by = 'system', at = new Date().toISOString()): AuditInfo {
@@ -105,20 +106,44 @@ function seed(): DemoDb {
     [1, 1, 35], [1, 2, 10], [2, 1, 40], [3, 1, 4.5], [4, 1, 60], [4, 2, 24], [5, 2, 80],
     [6, 1, 3], [7, 2, 40], [8, 1, 500], [8, 2, 150], [9, 1, 12],
   ]
+  // Historial de los últimos 14 días: una entrada inicial y dos salidas por fila, que terminan en el saldo actual.
   let movementId = 0
   const stock: StockRow[] = initial.map(([productId, warehouseId, quantity]) => ({ productId, warehouseId, quantity }))
-  const movements: Movement[] = initial.map(([productId, warehouseId, quantity], i) => {
+  const movements: Movement[] = []
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+  initial.forEach(([productId, warehouseId, final], i) => {
     const product = products[productId - 1]
     const warehouse = warehouses[warehouseId - 1]
-    return {
-      id: ++movementId, type: 'IN', quantity, balanceAfter: quantity, reason: 'Inventario inicial',
+    const factor = 10 ** product.unit.decimals
+    const sold = Math.round(final * 0.3 * factor) / factor
+    const firstOut = Math.round((sold / 2) * factor) / factor
+    const ref = {
       product: { id: product.id, sku: product.sku, name: product.name, unitCode: product.unit.code, unitDecimals: product.unit.decimals },
       warehouse: { id: warehouse.id, code: warehouse.code, name: warehouse.name },
-      // Repartidos en los últimos días para que el resumen de la demo muestre actividad.
-      createdAt: new Date(Date.now() - (initial.length - i) * 9 * 3_600_000).toISOString(), createdBy: 'system',
+    }
+    const start = final + sold
+    movements.push({ id: ++movementId, type: 'IN', quantity: start, balanceAfter: start, reason: 'Inventario inicial',
+      createdAt: hoursAgo(336 - i * 3), createdBy: 'system', ...ref })
+    if (firstOut > 0) {
+      movements.push({ id: ++movementId, type: 'OUT', quantity: -firstOut, balanceAfter: Math.round((start - firstOut) * 1000) / 1000,
+        reason: 'Venta', createdAt: hoursAgo(200 - i * 7), createdBy: 'manager', ...ref })
+    }
+    if (sold - firstOut > 0) {
+      movements.push({ id: ++movementId, type: 'OUT', quantity: -Math.round((sold - firstOut) * 1000) / 1000, balanceAfter: final,
+        reason: 'Venta', createdAt: hoursAgo(90 - i * 5), createdBy: 'manager', ...ref })
     }
   })
-  return { seq: 100, roles, users, categories, units, suppliers, products, warehouses, stock, movements }
+  movements.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  // Historial de ejemplo para que la pantalla de auditoría no arranque vacía.
+  const ago = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString()
+  const auditLog: AuditEntry[] = [
+    { id: 1, occurredAt: ago(30), actor: 'manager', action: 'LOGIN', entityType: 'user', entityId: '2', summary: 'manager' },
+    { id: 2, occurredAt: ago(29.5), actor: 'manager', action: 'UPDATE', entityType: 'product', entityId: '6', summary: 'Martillo carpintero (FER-001)' },
+    { id: 3, occurredAt: ago(29), actor: 'manager', action: 'CREATE', entityType: 'supplier', entityId: '3', summary: 'Herramientas Centro' },
+    { id: 4, occurredAt: ago(20), actor: 'desconocido', action: 'LOGIN_FAILED', entityType: 'user', summary: 'desconocido' },
+    { id: 5, occurredAt: ago(6), actor: 'viewer', action: 'LOGIN', entityType: 'user', entityId: '3', summary: 'viewer' },
+  ]
+  return { seq: 100, roles, users, categories, units, suppliers, products, warehouses, stock, movements, audit: auditLog }
 }
 
 let db: DemoDb | null = null

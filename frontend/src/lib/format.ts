@@ -13,6 +13,18 @@ export function formatMoney(value: number | null | undefined): string {
   }
 }
 
+export function formatMoneyCompact(value: number): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
+export function formatPercent(ratio: number): string {
+  return new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 }).format(ratio)
+}
+
 export function formatNumber(value: number | null | undefined, decimals = 0): string {
   if (value === null || value === undefined) return '—'
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: decimals }).format(value)

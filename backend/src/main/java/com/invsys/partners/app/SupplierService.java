@@ -9,6 +9,8 @@ import com.invsys.shared.web.NotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +21,10 @@ public class SupplierService {
     private final SupplierRepository suppliers;
     private final SupplierUsage usage;
 
-    public SupplierService(SupplierRepository suppliers, SupplierUsage usage) {
+    private final AuditLog audit;
+
+    public SupplierService(SupplierRepository suppliers, SupplierUsage usage, AuditLog audit) {
+        this.audit = audit;
         this.suppliers = suppliers;
         this.usage = usage;
     }
@@ -47,12 +52,15 @@ public class SupplierService {
     public SupplierResponse create(SupplierRequest request) {
         Supplier supplier = new Supplier(request.name().trim());
         apply(supplier, request);
-        return SupplierResponse.of(suppliers.save(supplier));
+        Supplier saved = suppliers.save(supplier);
+        audit.record(AuditAction.CREATE, "supplier", saved.getId(), saved.getName());
+        return SupplierResponse.of(saved);
     }
 
     public SupplierResponse update(Long id, SupplierRequest request) {
         Supplier supplier = find(id);
         apply(supplier, request);
+        audit.record(AuditAction.UPDATE, "supplier", id, supplier.getName());
         return SupplierResponse.of(supplier);
     }
 
@@ -62,6 +70,7 @@ public class SupplierService {
             throw new ConflictException("El proveedor tiene productos asociados; desactivalo en lugar de eliminarlo");
         }
         suppliers.delete(supplier);
+        audit.record(AuditAction.DELETE, "supplier", id, supplier.getName());
     }
 
     private Supplier find(Long id) {

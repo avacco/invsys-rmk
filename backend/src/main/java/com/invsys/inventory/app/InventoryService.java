@@ -22,6 +22,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +41,11 @@ public class InventoryService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
+    private final AuditLog audit;
+
     public InventoryService(ProductRepository products, WarehouseRepository warehouses, StockLevelRepository levels,
-                            StockMovementRepository movements, ApplicationEventPublisher events, Clock clock) {
+                            StockMovementRepository movements, ApplicationEventPublisher events, Clock clock, AuditLog audit) {
+        this.audit = audit;
         this.products = products;
         this.warehouses = warehouses;
         this.levels = levels;
@@ -51,6 +56,24 @@ public class InventoryService {
 
     @Transactional
     public List<MovementResponse> register(MovementRequest r) {
+        List<MovementResponse> result = doRegister(r);
+        audit.record(AuditAction.STOCK_MOVEMENT, "product", r.productId(), describe(result));
+        return result;
+    }
+
+    /** Descriptor neutral respecto del idioma, p. ej. "OUT · -3 u · Martillo (FER-001) · Almacén principal". */
+    private static String describe(List<MovementResponse> movements) {
+        MovementResponse first = movements.get(0);
+        String type = movements.size() > 1 ? "TRANSFER" : first.type().name();
+        String qty = (movements.size() > 1 ? first.quantity().negate() : first.quantity()).stripTrailingZeros().toPlainString();
+        String where = movements.size() > 1
+                ? first.warehouse().name() + " → " + movements.get(1).warehouse().name()
+                : first.warehouse().name();
+        return "%s · %s %s · %s (%s) · %s".formatted(type, qty, first.product().unitCode(),
+                first.product().name(), first.product().sku(), where);
+    }
+
+    private List<MovementResponse> doRegister(MovementRequest r) {
         Product product = products.findById(r.productId())
                 .orElseThrow(() -> new BadRequestException("El producto " + r.productId() + " no existe"));
         Warehouse source = activeWarehouse(r.warehouseId());

@@ -10,6 +10,8 @@ import java.time.Clock;
 import java.time.Instant;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +32,11 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
+    private final AuditLog audit;
+
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens, TokenService tokens,
-                       PasswordEncoder passwordEncoder, Clock clock) {
+                       PasswordEncoder passwordEncoder, Clock clock, AuditLog audit) {
+        this.audit = audit;
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.tokens = tokens;
@@ -45,6 +50,7 @@ public class AuthService {
         if (user == null || !user.isEnabled() || !passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
+        audit.recordAs(user.getUsername(), AuditAction.LOGIN, "user", user.getId(), user.getUsername());
         return openSession(user, clock.instant());
     }
 
@@ -59,6 +65,7 @@ public class AuthService {
         User user = current.getUser();
         if (current.isRevoked()) {
             refreshTokens.revokeAllForUser(user.getId(), now);
+            audit.recordAs(user.getUsername(), AuditAction.SESSION_REVOKED, "user", user.getId(), user.getUsername());
             throw new UnauthorizedException("Sesión inválida");
         }
         if (current.isExpired(now) || !user.isEnabled()) {
@@ -74,8 +81,11 @@ public class AuthService {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             return;
         }
-        refreshTokens.findByTokenHash(TokenService.hash(rawRefreshToken))
-                .ifPresent(token -> token.revoke(clock.instant()));
+        refreshTokens.findByTokenHash(TokenService.hash(rawRefreshToken)).ifPresent(token -> {
+            token.revoke(clock.instant());
+            User user = token.getUser();
+            audit.recordAs(user.getUsername(), AuditAction.LOGOUT, "user", user.getId(), user.getUsername());
+        });
     }
 
     @Transactional

@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router'
-import { ArrowLeftRight, Boxes, ClipboardList, Home, LogOut, Menu, Moon, Package, ShieldCheck, Sun, Truck, Users, Warehouse, X, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, BarChart3, Boxes, ClipboardList, History, Home, LogOut, Menu, Moon, Package, ShieldCheck, Sun, Truck, Users, Warehouse, X, type LucideIcon } from 'lucide-react'
 import type { PermissionValue } from '@/api/types'
 import { useAuth } from '@/auth/AuthContext'
 import { useUi } from '@/store/ui'
@@ -21,12 +21,14 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Inicio', icon: Home },
   { to: '/inventory', label: 'Stock', icon: ClipboardList, permission: 'inventory:read' },
   { to: '/inventory/movements', label: 'Movimientos', icon: ArrowLeftRight, permission: 'inventory:read' },
+  { to: '/reports', label: 'Reportes', icon: BarChart3, permission: 'inventory:read' },
   { to: '/products', label: 'Productos', icon: Package, permission: 'catalog:read' },
   { to: '/catalog', label: 'Categorías y unidades', icon: Boxes, permission: 'catalog:read' },
   { to: '/warehouses', label: 'Almacenes', icon: Warehouse, permission: 'inventory:read' },
   { to: '/suppliers', label: 'Proveedores', icon: Truck, permission: 'partners:read' },
   { to: '/users', label: 'Usuarios', icon: Users, permission: 'users:read' },
   { to: '/roles', label: 'Roles y permisos', icon: ShieldCheck, permission: 'roles:read' },
+  { to: '/audit', label: 'Auditoría', icon: History, permission: 'audit:read' },
 ]
 
 export function Layout() {

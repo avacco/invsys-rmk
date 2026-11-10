@@ -1,5 +1,7 @@
 package com.invsys.identity.web;
 
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import com.invsys.identity.app.AuthService;
 import com.invsys.identity.app.AuthService.Session;
 import com.invsys.identity.app.IdentityDtos.LoginRequest;
@@ -25,16 +27,24 @@ public class AuthController {
     private final AuthService authService;
     private final UserService userService;
     private final AuthCookies cookies;
+    private final AuditLog audit;
 
-    public AuthController(AuthService authService, UserService userService, AuthCookies cookies) {
+    public AuthController(AuthService authService, UserService userService, AuthCookies cookies, AuditLog audit) {
         this.authService = authService;
         this.userService = userService;
         this.cookies = cookies;
+        this.audit = audit;
     }
 
     @PostMapping("/login")
     public ResponseEntity<MeResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withSession(authService.login(request.username(), request.password()));
+        try {
+            return withSession(authService.login(request.username(), request.password()));
+        } catch (UnauthorizedException e) {
+            // Fuera de la transacción del login (que se revirtió): se guarda en el momento.
+            audit.recordAs(request.username(), AuditAction.LOGIN_FAILED, "user", null, request.username());
+            throw e;
+        }
     }
 
     @PostMapping("/refresh")

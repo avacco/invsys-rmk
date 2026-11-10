@@ -17,6 +17,8 @@ const RolesPage = lazy(() => import('./features/roles/RolesPage'))
 const StockPage = lazy(() => import('./features/inventory/StockPage'))
 const MovementsPage = lazy(() => import('./features/inventory/MovementsPage'))
 const WarehousesPage = lazy(() => import('./features/warehouses/WarehousesPage'))
+const ReportsPage = lazy(() => import('./features/reports/ReportsPage'))
+const AuditPage = lazy(() => import('./features/audit/AuditPage'))
 
 const queryClient = createQueryClient()
 
@@ -33,6 +35,8 @@ export function App() {
                 <Route path="inventory" element={<RequirePermission permission="inventory:read"><StockPage /></RequirePermission>} />
                 <Route path="inventory/movements" element={<RequirePermission permission="inventory:read"><MovementsPage /></RequirePermission>} />
                 <Route path="warehouses" element={<RequirePermission permission="inventory:read"><WarehousesPage /></RequirePermission>} />
+                <Route path="reports" element={<RequirePermission permission="inventory:read"><ReportsPage /></RequirePermission>} />
+                <Route path="audit" element={<RequirePermission permission="audit:read"><AuditPage /></RequirePermission>} />
                 <Route path="products" element={<RequirePermission permission="catalog:read"><ProductsPage /></RequirePermission>} />
                 <Route path="catalog" element={<RequirePermission permission="catalog:read"><CatalogPage /></RequirePermission>} />
                 <Route path="suppliers" element={<RequirePermission permission="partners:read"><SuppliersPage /></RequirePermission>} />

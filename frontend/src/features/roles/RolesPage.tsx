@@ -13,7 +13,7 @@ import { handleApiError } from '@/lib/errors'
 import { toast } from '@/store/toast'
 
 const RESOURCE_LABELS: Record<string, string> = {
-  catalog: 'Catálogo', inventory: 'Inventario', partners: 'Proveedores', users: 'Usuarios', roles: 'Roles',
+  catalog: 'Catálogo', inventory: 'Inventario', partners: 'Proveedores', users: 'Usuarios', roles: 'Roles', audit: 'Auditoría',
 }
 const OPERATION_LABELS: Record<string, string> = { read: 'Ver', write: 'Editar' }
 

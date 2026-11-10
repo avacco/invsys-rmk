@@ -45,6 +45,7 @@ export type PermissionValue =
   | 'roles:write'
   | 'inventory:read'
   | 'inventory:write'
+  | 'audit:read'
 
 export interface Me {
   id: number
@@ -295,4 +296,58 @@ export interface InventorySummary {
   lowStockProducts: number
   movementsLast7Days: number
   activeWarehouses: number
+}
+
+// --- Auditoría ---
+
+export type AuditAction =
+  | 'CREATE' | 'UPDATE' | 'DELETE' | 'STOCK_MOVEMENT' | 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'SESSION_REVOKED'
+
+export interface AuditEntry {
+  id: number
+  occurredAt: string
+  actor?: string
+  action: AuditAction
+  entityType?: string
+  entityId?: string
+  /** Descriptor neutral respecto del idioma (nombre, SKU, cantidades). */
+  summary?: string
+}
+
+export interface AuditQuery extends PageQuery {
+  actor?: string
+  action?: AuditAction
+  entityType?: string
+  entityId?: string
+  q?: string
+  from?: string
+  to?: string
+}
+
+// --- Reportes ---
+
+export type ValuationGroup = 'CATEGORY' | 'WAREHOUSE'
+
+export interface ValuationRow {
+  /** null en "sin categoría". */
+  id: number | null
+  name: string | null
+  products: number
+  costValue: number
+  saleValue: number
+}
+
+export interface ActivityDay {
+  date: string
+  inValue: number
+  outValue: number
+  adjustmentValue: number
+  movements: number
+}
+
+export interface TopProduct {
+  product: StockProductRef
+  outQuantity: number
+  outValue: number
+  movements: number
 }

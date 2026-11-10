@@ -14,7 +14,8 @@ Proyecto de portfolio. Es una **base general y neutral respecto del país**: no 
 - **Inicio con indicadores reales:** valor del inventario al costo, productos con stock bajo, movimientos de la semana y últimos movimientos.
 - **Categorías, unidades de medida, almacenes y proveedores** con validación de referencias (no se borra lo que está en uso).
 - **Usuarios y roles** administrables desde la interfaz.
-- **Auditoría básica:** cada registro guarda quién y cuándo lo creó y lo modificó, tomado de la sesión.
+- **Auditoría:** registro de altas, cambios, bajas, movimientos de stock e inicios de sesión (incluidos los fallidos), con filtros y exportación CSV. Solo se guardan los cambios confirmados: una operación rechazada no deja rastro falso.
+- **Reportes:** actividad diaria (valor de entradas y salidas), valor del inventario por categoría o almacén y productos con más salidas. Gráficos con paleta validada para daltonismo y vista de tabla.
 - **Modo demo sin backend:** el frontend se publica como sitio estático con una API simulada ([ADR 0002](docs/adr/0002-demo-frontend-sin-backend.md)).
 
 ## Stack
@@ -37,6 +38,7 @@ invsys/
 │       ├── identity/    usuarios, roles, permisos, autenticación
 │       ├── catalog/     productos, categorías, unidades
 │       ├── inventory/   almacenes, saldos y movimientos de stock
+│       ├── audit/       registro de auditoría
 │       ├── partners/    proveedores
 │       ├── storage/     almacenamiento de imágenes (intercambiable)
 │       └── shared/      auditoría, errores, paginación
@@ -74,7 +76,7 @@ Usuarios de prueba (perfil `dev` y demo):
 
 | Usuario | Contraseña | Rol |
 |---|---|---|
-| `admin` | `admin1234` | ADMIN — acceso total |
+| `admin` | `admin1234` | ADMIN — acceso total, incluida la auditoría |
 | `manager` | `manager1234` | MANAGER — catálogo, inventario y proveedores |
 | `viewer` | `viewer1234` | VIEWER — solo lectura |
 
@@ -104,5 +106,5 @@ cd frontend && npm test
 - [x] **Fase 0 — Base:** monorepo, entorno local, ADRs
 - [x] **Fase 1 — Identity y catálogo:** autenticación, permisos, catálogo, proveedores, usuarios, demo, CI
 - [x] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo
-- [ ] **Fase 3 — Visibilidad:** registro de auditoría completo, reportes, i18n (es/en)
+- [ ] **Fase 3 — Visibilidad:** ~~auditoría~~, ~~reportes~~, i18n (es/en)
 - [ ] **Fase 4 — Vidriera:** tests E2E, capturas, documentación final

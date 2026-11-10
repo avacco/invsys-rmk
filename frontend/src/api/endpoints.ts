@@ -3,7 +3,8 @@ import type {
   Category, CategoryRequest, CreateUserRequest, LoginRequest, Me, Meta, Page, PageQuery, PermissionInfo,
   Product, ProductQuery, ProductRequest, Role, RoleRequest, Supplier, SupplierQuery, SupplierRequest,
   Unit, UnitRequest, UpdateUserRequest, User, Warehouse, WarehouseRequest, Movement, MovementQuery,
-  MovementRequest, ProductStock, StockQuery, InventorySummary,
+  MovementRequest, ProductStock, StockQuery, InventorySummary, AuditEntry, AuditQuery, ValuationGroup, ValuationRow,
+  ActivityDay, TopProduct,
 } from './types'
 
 export const authApi = {
@@ -79,4 +80,15 @@ export const inventoryApi = {
   movements: (query: MovementQuery) => request<Page<Movement>>('/inventory/movements', { query: { ...query } }),
   register: (body: MovementRequest) => request<Movement[]>('/inventory/movements', { method: 'POST', body }),
   summary: () => request<InventorySummary>('/inventory/summary'),
+}
+
+export const auditApi = {
+  list: (query: AuditQuery) => request<Page<AuditEntry>>('/audit', { query: { ...query } }),
+}
+
+export const reportsApi = {
+  valuation: (groupBy: ValuationGroup) => request<ValuationRow[]>('/reports/valuation', { query: { groupBy } }),
+  activity: (days: number, tz = Intl.DateTimeFormat().resolvedOptions().timeZone) =>
+    request<ActivityDay[]>('/reports/activity', { query: { days, tz } }),
+  topProducts: (days: number, limit = 10) => request<TopProduct[]>('/reports/top-products', { query: { days, limit } }),
 }

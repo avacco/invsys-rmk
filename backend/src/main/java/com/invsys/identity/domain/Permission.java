@@ -17,7 +17,8 @@ public enum Permission {
     ROLES_READ("roles:read"),
     ROLES_WRITE("roles:write"),
     INVENTORY_READ("inventory:read"),
-    INVENTORY_WRITE("inventory:write");
+    INVENTORY_WRITE("inventory:write"),
+    AUDIT_READ("audit:read");
 
     private final String value;
 

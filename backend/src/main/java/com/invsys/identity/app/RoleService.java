@@ -14,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.springframework.data.domain.Sort;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,10 @@ public class RoleService {
     private final RoleRepository roles;
     private final UserRepository users;
 
-    public RoleService(RoleRepository roles, UserRepository users) {
+    private final AuditLog audit;
+
+    public RoleService(RoleRepository roles, UserRepository users, AuditLog audit) {
+        this.audit = audit;
         this.roles = roles;
         this.users = users;
     }
@@ -44,7 +49,9 @@ public class RoleService {
             throw new ConflictException("Ya existe un rol con ese nombre");
         }
         validatePermissions(request.permissions());
-        return RoleResponse.of(roles.save(new Role(request.name(), request.description(), request.permissions())));
+        Role saved = roles.save(new Role(request.name(), request.description(), request.permissions()));
+        audit.record(AuditAction.CREATE, "role", saved.getId(), describe(saved));
+        return RoleResponse.of(saved);
     }
 
     public RoleResponse update(Long id, RoleRequest request) {
@@ -57,6 +64,7 @@ public class RoleService {
         }
         validatePermissions(request.permissions());
         role.update(request.name(), request.description(), request.permissions());
+        audit.record(AuditAction.UPDATE, "role", id, describe(role));
         return RoleResponse.of(role);
     }
 
@@ -69,10 +77,15 @@ public class RoleService {
             throw new ConflictException("El rol tiene usuarios asignados");
         }
         roles.delete(role);
+        audit.record(AuditAction.DELETE, "role", id, role.getName());
     }
 
     public List<PermissionResponse> permissions() {
         return Arrays.stream(Permission.values()).map(p -> new PermissionResponse(p.value(), p.resource())).toList();
+    }
+
+    private static String describe(Role role) {
+        return role.getName() + " · " + String.join(", ", role.getPermissions().stream().sorted().toList());
     }
 
     private Role find(Long id) {

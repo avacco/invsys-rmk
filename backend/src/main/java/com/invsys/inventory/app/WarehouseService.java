@@ -9,6 +9,8 @@ import com.invsys.shared.web.ConflictException;
 import com.invsys.shared.web.NotFoundException;
 import java.util.List;
 import org.springframework.data.domain.Sort;
+import com.invsys.audit.app.AuditLog;
+import com.invsys.audit.domain.AuditAction;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +21,10 @@ public class WarehouseService {
     private final WarehouseRepository warehouses;
     private final StockMovementRepository movements;
 
-    public WarehouseService(WarehouseRepository warehouses, StockMovementRepository movements) {
+    private final AuditLog audit;
+
+    public WarehouseService(WarehouseRepository warehouses, StockMovementRepository movements, AuditLog audit) {
+        this.audit = audit;
         this.warehouses = warehouses;
         this.movements = movements;
     }
@@ -34,8 +39,10 @@ public class WarehouseService {
         if (warehouses.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("Ya existe un almacén con el código " + code);
         }
-        return WarehouseResponse.of(warehouses.save(
-                new Warehouse(code, request.name().trim(), clean(request.address()), request.active() == null || request.active())));
+        Warehouse saved = warehouses.save(
+                new Warehouse(code, request.name().trim(), clean(request.address()), request.active() == null || request.active()));
+        audit.record(AuditAction.CREATE, "warehouse", saved.getId(), saved.getName() + " (" + code + ")");
+        return WarehouseResponse.of(saved);
     }
 
     public WarehouseResponse update(Long id, WarehouseRequest request) {
@@ -45,6 +52,7 @@ public class WarehouseService {
             throw new ConflictException("Ya existe un almacén con el código " + code);
         }
         warehouse.update(code, request.name().trim(), clean(request.address()), request.active() == null || request.active());
+        audit.record(AuditAction.UPDATE, "warehouse", id, warehouse.getName() + " (" + code + ")");
         return WarehouseResponse.of(warehouse);
     }
 
@@ -54,6 +62,7 @@ public class WarehouseService {
             throw new ConflictException("El almacén tiene movimientos registrados; desactivalo en lugar de eliminarlo");
         }
         warehouses.delete(warehouse);
+        audit.record(AuditAction.DELETE, "warehouse", id, warehouse.getName() + " (" + warehouse.getCode() + ")");
     }
 
     private Warehouse find(Long id) {
