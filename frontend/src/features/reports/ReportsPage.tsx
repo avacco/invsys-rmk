@@ -92,7 +92,7 @@ function ActivityChart({ days }: { days: number }) {
           <BarChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barGap={2} barCategoryGap="20%">
             <CartesianGrid stroke={theme.grid} vertical={false} />
             <XAxis dataKey="date" tickFormatter={shortDate} stroke={theme.axis} tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
-            <YAxis tickFormatter={formatMoneyCompact} stroke={theme.axis} tickLine={false} axisLine={false} width={56} fontSize={12} />
+            <YAxis tickFormatter={formatMoneyCompact} stroke={theme.axis} tickLine={false} axisLine={false} width={80} fontSize={12} />
             <Tooltip content={<ChartTooltip labelFormatter={shortDate} />} cursor={{ fill: theme.grid, opacity: 0.4 }} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: 13, color: theme.text }} />
             <Bar dataKey="inValue" name={t('Entradas')} fill={theme.series[0]} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />

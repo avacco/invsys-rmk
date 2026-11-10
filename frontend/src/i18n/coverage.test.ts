@@ -39,6 +39,12 @@ describe('i18n', () => {
       for (const m of code.matchAll(/>\s*([^<>{}=;`[\]\n()]*[A-Za-zÁÉÍÓÚáéíóúñ¿¡][^<>{}=;`[\]\n]*?)\s*</g)) {
         if (!UNTRANSLATED.has(m[1].trim()) && !/^([:?]|return\b|if\b)/.test(m[1].trim())) raw.push(`${file}: ${m[1].trim()}`)
       }
+      // Texto pegado a una expresión: "Costo {precio}" o "{n} resultados".
+      const withoutStrings = code.replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+      for (const m of withoutStrings.matchAll(/(?:>|\})([ \t]*[A-Za-zÁÉÍÓÚáéíóúñ¿¡][^<>{}=;`[\]\n()]*?)[ \t]*\{/g)) {
+        const text = m[1].trim()
+        if (text && !text.includes("'") && !/^(return|if|else|const|let|export|function|import|catch|try|finally)\b/.test(text) && !UNTRANSLATED.has(text)) raw.push(`${file}: ${text} {…}`)
+      }
       // Literales con varias palabras fuera de t()/tk() (p. ej. {cond ? 'Texto' : 'Otro'}).
       for (const line of code.split('\n')) {
         if (/className|import |queryKey|\.test\(|console\./.test(line)) continue

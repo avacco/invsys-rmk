@@ -75,7 +75,8 @@ export function MovementForm({ open, initialProductId, onClose }: Props) {
       reason: '',
       reference: '',
     })
-  }, [open, initialProductId, activeWarehouses, reset])
+  // products.data: si el formulario se inicializa antes de que lleguen las opciones, el <select> no muestra el valor.
+  }, [open, initialProductId, activeWarehouses, products.data, reset])
 
   const type = watch('type')
   const productId = watch('productId')

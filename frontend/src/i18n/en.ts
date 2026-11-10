@@ -123,6 +123,7 @@ export const en: Record<string, string> = {
   'Proveedor': 'Supplier',
   'Sin proveedor': 'No supplier',
   'Costo': 'Cost',
+  'Costo {{price}}': 'Cost {{price}}',
   'Precio de venta': 'Sale price',
   'Venta': 'Price',
   'Stock mínimo': 'Minimum stock',

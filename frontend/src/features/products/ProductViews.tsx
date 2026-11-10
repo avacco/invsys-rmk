@@ -29,6 +29,7 @@ function Actions({ product, onEdit, onDelete }: { product: Product; onEdit: View
 }
 
 export function ProductGrid({ products, canWrite, onEdit, onDelete }: ViewProps) {
+  const { t } = useTranslation()
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
       {products.map((p) => (
@@ -49,7 +50,7 @@ export function ProductGrid({ products, canWrite, onEdit, onDelete }: ViewProps)
             <div className="mt-auto flex items-end justify-between pt-2">
               <div>
                 <p className="text-lg font-semibold">{formatMoney(p.salePrice)}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Costo {formatMoney(p.costPrice)}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('Costo {{price}}', { price: formatMoney(p.costPrice) })}</p>
               </div>
               {canWrite && <Actions product={p} onEdit={onEdit} onDelete={onDelete} />}
             </div>

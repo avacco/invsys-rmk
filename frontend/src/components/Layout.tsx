@@ -51,7 +51,6 @@ export function Layout() {
     <div className="flex min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-800 dark:bg-gray-950 ${sidebarCollapsed ? 'w-0 md:w-16' : 'w-64'}`}
-        aria-label={t('Navegación principal')}
       >
         <div className={`flex items-center gap-3 py-6 ${sidebarCollapsed ? 'justify-center px-2' : 'px-6'}`}>
           <img src={darkMode ? logoDark : logo} alt="" className="h-9 w-9 shrink-0" />
@@ -60,7 +59,7 @@ export function Layout() {
             <Button variant="ghost" className="ml-auto px-2 md:hidden" aria-label={t('Cerrar menú')} onClick={toggleSidebar} icon={<X className="h-5 w-5" />} />
           )}
         </div>
-        <nav className="flex-1 space-y-1 px-2">
+        <nav className="flex-1 space-y-1 px-2" aria-label={t('Navegación principal')}>
           {NAV.filter((item) => !item.permission || can(item.permission)).map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
