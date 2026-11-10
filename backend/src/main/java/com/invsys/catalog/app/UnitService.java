@@ -37,7 +37,7 @@ public class UnitService {
     public UnitResponse create(UnitRequest request) {
         String code = request.code().trim();
         if (units.existsByCodeIgnoreCase(code)) {
-            throw new ConflictException("Ya existe una unidad con ese código");
+            throw new ConflictException("error.unit.duplicate");
         }
         Unit saved = units.save(new Unit(code, request.name().trim(), request.decimals()));
         audit.record(AuditAction.CREATE, "unit", saved.getId(), saved.getName() + " (" + code + ")");
@@ -48,7 +48,7 @@ public class UnitService {
         Unit unit = find(id);
         String code = request.code().trim();
         if (units.existsByCodeIgnoreCaseAndIdNot(code, id)) {
-            throw new ConflictException("Ya existe una unidad con ese código");
+            throw new ConflictException("error.unit.duplicate");
         }
         unit.update(code, request.name().trim(), request.decimals());
         audit.record(AuditAction.UPDATE, "unit", id, unit.getName() + " (" + code + ")");
@@ -58,13 +58,13 @@ public class UnitService {
     public void delete(Long id) {
         Unit unit = find(id);
         if (products.existsByUnitId(id)) {
-            throw new ConflictException("La unidad está en uso");
+            throw new ConflictException("error.unit.inUse");
         }
         units.delete(unit);
         audit.record(AuditAction.DELETE, "unit", id, unit.getName() + " (" + unit.getCode() + ")");
     }
 
     private Unit find(Long id) {
-        return units.findById(id).orElseThrow(() -> new NotFoundException("Unidad", id));
+        return units.findById(id).orElseThrow(() -> new NotFoundException("unit", id));
     }
 }

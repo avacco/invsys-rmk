@@ -1,5 +1,6 @@
 import type { FieldValues, Path, UseFormSetError } from 'react-hook-form'
 import { ApiError } from '@/api/client'
+import { tk } from '@/i18n'
 import { toast } from '@/store/toast'
 
 /** Muestra un error de la API: los errores de campo van al formulario, el resto a un toast. */
@@ -13,5 +14,5 @@ export function handleApiError<T extends FieldValues>(error: unknown, setError?:
     toast.error(error.message)
     return
   }
-  toast.error('Ocurrió un error inesperado')
+  toast.error(tk('Ocurrió un error inesperado'))
 }

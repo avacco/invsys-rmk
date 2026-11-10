@@ -1,6 +1,12 @@
 import { forwardRef, useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode,
   type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
+/*
+ * Los componentes de este archivo traducen sus textos (label, title, description, placeholder
+ * y el texto plano de Button, Th y Badge), así las pantallas pueden pasar el español directamente.
+ */
 
 const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ')
 
@@ -22,6 +28,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'primary', loading, icon, className, children, disabled, ...props }: ButtonProps) {
+  const { t } = useTranslation()
   return (
     <button
       type="button"
@@ -30,7 +37,7 @@ export function Button({ variant = 'primary', loading, icon, className, children
       {...props}
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
-      {children}
+      {typeof children === 'string' ? t(children) : children}
     </button>
   )
 }
@@ -66,11 +73,12 @@ export function Field({ label, error, htmlFor, children, className }: {
   children: ReactNode
   className?: string
 }) {
+  const { t } = useTranslation()
   return (
     <div className={cx('flex flex-col gap-1', className)}>
-      <label htmlFor={htmlFor} className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <label htmlFor={htmlFor} className="text-sm font-medium text-gray-700 dark:text-gray-300">{t(label)}</label>
       {children}
-      {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{t(error)}</p>}
     </div>
   )
 }
@@ -80,10 +88,11 @@ export function SearchInput({ value, onChange, placeholder = 'Buscar...' }: {
   onChange: (value: string) => void
   placeholder?: string
 }) {
+  const { t } = useTranslation()
   return (
     <div className="relative w-full sm:w-72">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-      <Input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="pl-9" aria-label={placeholder} />
+      <Input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={t(placeholder)} className="pl-9" aria-label={t(placeholder)} />
     </div>
   )
 }
@@ -91,11 +100,12 @@ export function SearchInput({ value, onChange, placeholder = 'Buscar...' }: {
 // --- Estructura ---
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">{title}</h1>
-        {description && <p className="mt-1 text-gray-500 dark:text-gray-400">{description}</p>}
+        <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">{t(title)}</h1>
+        {description && <p className="mt-1 text-gray-500 dark:text-gray-400">{t(description)}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -114,33 +124,37 @@ export function Badge({ tone = 'gray', children }: { tone?: 'gray' | 'green' | '
     blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
     amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
   }
-  return <span className={cx('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', tones[tone])}>{children}</span>
+  const { t } = useTranslation()
+  return <span className={cx('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', tones[tone])}>{typeof children === 'string' ? t(children) : children}</span>
 }
 
 export function Spinner({ fullScreen }: { fullScreen?: boolean }) {
+  const { t } = useTranslation()
   return (
-    <div className={cx('flex items-center justify-center', fullScreen ? 'min-h-screen' : 'py-16')} role="status" aria-label="Cargando">
+    <div className={cx('flex items-center justify-center', fullScreen ? 'min-h-screen' : 'py-16')} role="status" aria-label={t('Cargando')}>
       <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
     </div>
   )
 }
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center gap-2 py-16 text-center text-gray-500 dark:text-gray-400">
-      <p className="text-lg font-medium">{title}</p>
-      {description && <p>{description}</p>}
+      <p className="text-lg font-medium">{t(title)}</p>
+      {description && <p>{t(description)}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   )
 }
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const { t } = useTranslation()
   return (
     <EmptyState
-      title="No se pudieron cargar los datos"
+      title={t('No se pudieron cargar los datos')}
       description={error instanceof Error ? error.message : undefined}
-      action={onRetry && <Button variant="secondary" onClick={onRetry}>Reintentar</Button>}
+      action={onRetry && <Button variant="secondary" onClick={onRetry}>{t('Reintentar')}</Button>}
     />
   )
 }
@@ -151,14 +165,15 @@ export function Pagination({ page, totalPages, totalElements, onChange }: {
   totalElements: number
   onChange: (page: number) => void
 }) {
+  const { t } = useTranslation()
   if (totalElements === 0) return null
   return (
     <div className="mt-6 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-      <span>{totalElements} resultado{totalElements === 1 ? '' : 's'}</span>
+      <span>{t(totalElements === 1 ? '{{count}} resultado' : '{{count}} resultados', { count: totalElements })}</span>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" aria-label="Página anterior" disabled={page <= 0} onClick={() => onChange(page - 1)} icon={<ChevronLeft className="h-4 w-4" />} />
-        <span>Página {page + 1} de {Math.max(totalPages, 1)}</span>
-        <Button variant="ghost" aria-label="Página siguiente" disabled={page + 1 >= totalPages} onClick={() => onChange(page + 1)} icon={<ChevronRight className="h-4 w-4" />} />
+        <Button variant="ghost" aria-label={t('Página anterior')} disabled={page <= 0} onClick={() => onChange(page - 1)} icon={<ChevronLeft className="h-4 w-4" />} />
+        <span>{t('Página {{page}} de {{total}}', { page: page + 1, total: Math.max(totalPages, 1) })}</span>
+        <Button variant="ghost" aria-label={t('Página siguiente')} disabled={page + 1 >= totalPages} onClick={() => onChange(page + 1)} icon={<ChevronRight className="h-4 w-4" />} />
       </div>
     </div>
   )
@@ -174,6 +189,7 @@ export function Modal({ open, title, onClose, children, footer, size = 'md' }: {
   footer?: ReactNode
   size?: 'md' | 'lg'
 }) {
+  const { t } = useTranslation()
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -184,11 +200,11 @@ export function Modal({ open, title, onClose, children, footer, size = 'md' }: {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title}
+      <div role="dialog" aria-modal="true" aria-label={t(title)}
         className={cx('flex max-h-[90vh] w-full flex-col rounded-xl bg-white shadow-xl dark:bg-gray-800', size === 'lg' ? 'max-w-3xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Button variant="ghost" className="px-2" aria-label="Cerrar" onClick={onClose} icon={<X className="h-5 w-5" />} />
+          <h2 className="text-lg font-semibold">{t(title)}</h2>
+          <Button variant="ghost" className="px-2" aria-label={t('Cerrar')} onClick={onClose} icon={<X className="h-5 w-5" />} />
         </div>
         <div className="overflow-y-auto px-6 py-4">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4 dark:border-gray-700">{footer}</div>}
@@ -206,13 +222,14 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Eliminar',
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Modal open={open} title={title} onClose={onCancel}
       footer={<>
-        <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
+        <Button variant="secondary" onClick={onCancel}>{t('Cancelar')}</Button>
         <Button variant="danger" loading={loading} onClick={onConfirm}>{confirmLabel}</Button>
       </>}>
-      <p className="text-gray-600 dark:text-gray-300">{message}</p>
+      <p className="text-gray-600 dark:text-gray-300">{typeof message === 'string' ? <TranslatedText text={message} /> : message}</p>
     </Modal>
   )
 }
@@ -226,9 +243,15 @@ export function Table({ children }: { children: ReactNode }) {
 }
 
 export function Th({ children, className }: { children?: ReactNode; className?: string }) {
-  return <th scope="col" className={cx('bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400', className)}>{children}</th>
+  const { t } = useTranslation()
+  return <th scope="col" className={cx('bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400', className)}>{typeof children === 'string' ? t(children) : children}</th>
 }
 
 export function Td({ children, className }: { children?: ReactNode; className?: string }) {
   return <td className={cx('px-4 py-3 text-gray-700 dark:text-gray-200', className)}>{children}</td>
+}
+
+function TranslatedText({ text }: { text: string }) {
+  const { t } = useTranslation()
+  return <>{t(text)}</>
 }

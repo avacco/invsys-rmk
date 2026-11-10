@@ -16,6 +16,7 @@ Proyecto de portfolio. Es una **base general y neutral respecto del país**: no 
 - **Usuarios y roles** administrables desde la interfaz.
 - **Auditoría:** registro de altas, cambios, bajas, movimientos de stock e inicios de sesión (incluidos los fallidos), con filtros y exportación CSV. Solo se guardan los cambios confirmados: una operación rechazada no deja rastro falso.
 - **Reportes:** actividad diaria (valor de entradas y salidas), valor del inventario por categoría o almacén y productos con más salidas. Gráficos con paleta validada para daltonismo y vista de tabla.
+- **Español e inglés:** interfaz, formatos de número y fecha, y mensajes de error de la API ([ADR 0005](docs/adr/0005-internacionalizacion.md)). Un test falla si queda texto sin traducir.
 - **Modo demo sin backend:** el frontend se publica como sitio estático con una API simulada ([ADR 0002](docs/adr/0002-demo-frontend-sin-backend.md)).
 
 ## Stack
@@ -24,7 +25,7 @@ Proyecto de portfolio. Es una **base general y neutral respecto del país**: no 
 |---|---|
 | Backend | Java 21, Spring Boot 3.5, Spring Security (resource server JWT), Spring Data JPA, Flyway, springdoc-openapi |
 | Base de datos | PostgreSQL 17 |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, React Hook Form + Zod |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, React Hook Form + Zod, i18next, Recharts |
 | Demo | MSW (Mock Service Worker) |
 | Tests | JUnit 5 + Testcontainers, Vitest + Testing Library |
 | CI/CD | GitHub Actions (tests + publicación de la demo en GitHub Pages) |
@@ -45,6 +46,7 @@ invsys/
 ├── frontend/            SPA (React)
 │   └── src/
 │       ├── api/         cliente HTTP y tipos del contrato
+│       ├── i18n/        traducciones (es → en) y test de cobertura
 │       ├── features/    una carpeta por pantalla
 │       └── mocks/       backend simulado para la demo y los tests
 ├── docs/adr/            decisiones de arquitectura
@@ -106,5 +108,5 @@ cd frontend && npm test
 - [x] **Fase 0 — Base:** monorepo, entorno local, ADRs
 - [x] **Fase 1 — Identity y catálogo:** autenticación, permisos, catálogo, proveedores, usuarios, demo, CI
 - [x] **Fase 2 — Inventario:** almacenes, stock por almacén, movimientos y transferencias, alertas de stock bajo
-- [ ] **Fase 3 — Visibilidad:** ~~auditoría~~, ~~reportes~~, i18n (es/en)
+- [x] **Fase 3 — Visibilidad:** auditoría, reportes, español e inglés
 - [ ] **Fase 4 — Vidriera:** tests E2E, capturas, documentación final

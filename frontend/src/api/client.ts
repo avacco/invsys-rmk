@@ -1,15 +1,19 @@
+import i18n from '@/i18n'
 import type { ProblemDetail } from './types'
 
 /** Error de la API con el detalle RFC 9457 ya parseado. */
 export class ApiError extends Error {
   readonly status: number
   readonly fieldErrors: Record<string, string>
+  /** Código estable del error (p. ej. error.category.inUse). */
+  readonly code?: string
 
   constructor(status: number, problem?: Partial<ProblemDetail>) {
     super(problem?.detail || problem?.title || `Error ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = problem?.errors ?? {}
+    this.code = problem?.code
   }
 }
 
@@ -50,9 +54,12 @@ async function send(path: string, opts: RequestOptions): Promise<Response> {
   return fetch(buildUrl(path, opts.query), {
     method: opts.method ?? 'GET',
     credentials: 'same-origin',
-    headers: isForm || opts.body === undefined
-      ? { Accept: 'application/json' }
-      : { Accept: 'application/json', 'Content-Type': 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      // El backend responde los errores en el idioma de la interfaz.
+      'Accept-Language': i18n.resolvedLanguage ?? 'es',
+      ...(isForm || opts.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
     body: isForm ? (opts.body as FormData) : opts.body === undefined ? undefined : JSON.stringify(opts.body),
   })
 }

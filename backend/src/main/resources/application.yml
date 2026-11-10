@@ -18,6 +18,10 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  messages:
+    basename: messages
+    # Si falta una traducción, se usa messages.properties (español), no el idioma del servidor.
+    fallback-to-system-locale: false
   jackson:
     default-property-inclusion: non_null
   data:

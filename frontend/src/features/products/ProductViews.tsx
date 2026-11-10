@@ -4,6 +4,7 @@ import { Badge, Button, Card, Table, Td, Th } from '@/components/ui'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { safeImageUrl } from '@/lib/url'
 import placeholder from '@/assets/product-placeholder.png'
+import { useTranslation } from 'react-i18next'
 
 interface ViewProps {
   products: Product[]
@@ -13,14 +14,16 @@ interface ViewProps {
 }
 
 function StatusBadge({ status }: { status: Product['status'] }) {
-  return status === 'ACTIVE' ? <Badge tone="green">Activo</Badge> : <Badge>Inactivo</Badge>
+  const { t } = useTranslation()
+  return status === 'ACTIVE' ? <Badge tone="green">{t('Activo')}</Badge> : <Badge>{t('Inactivo')}</Badge>
 }
 
 function Actions({ product, onEdit, onDelete }: { product: Product; onEdit: ViewProps['onEdit']; onDelete: ViewProps['onDelete'] }) {
+  const { t } = useTranslation()
   return (
     <div className="flex gap-1">
-      <Button variant="ghost" className="px-2" aria-label={`Editar ${product.name}`} onClick={() => onEdit(product)} icon={<Pencil className="h-4 w-4" />} />
-      <Button variant="ghost" className="px-2 hover:text-red-600" aria-label={`Eliminar ${product.name}`} onClick={() => onDelete(product)} icon={<Trash2 className="h-4 w-4" />} />
+      <Button variant="ghost" className="px-2" aria-label={t('Editar {{name}}', { name: product.name })} onClick={() => onEdit(product)} icon={<Pencil className="h-4 w-4" />} />
+      <Button variant="ghost" className="px-2 hover:text-red-600" aria-label={t('Eliminar {{name}}', { name: product.name })} onClick={() => onDelete(product)} icon={<Trash2 className="h-4 w-4" />} />
     </div>
   )
 }
@@ -58,13 +61,14 @@ export function ProductGrid({ products, canWrite, onEdit, onDelete }: ViewProps)
 }
 
 export function ProductTable({ products, canWrite, onEdit, onDelete }: ViewProps) {
+  const { t } = useTranslation()
   return (
     <Table>
       <thead>
         <tr>
-          <Th>SKU</Th><Th>Nombre</Th><Th>Categoría</Th><Th>Proveedor</Th>
-          <Th className="text-right">Costo</Th><Th className="text-right">Venta</Th><Th className="text-right">Stock mín.</Th>
-          <Th>Estado</Th>{canWrite && <Th />}
+          <Th>{t('SKU')}</Th><Th>{t('Nombre')}</Th><Th>{t('Categoría')}</Th><Th>{t('Proveedor')}</Th>
+          <Th className="text-right">{t('Costo')}</Th><Th className="text-right">{t('Venta')}</Th><Th className="text-right">{t('Stock mín.')}</Th>
+          <Th>{t('Estado')}</Th>{canWrite && <Th />}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">

@@ -11,7 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,41 +27,38 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler(NotFoundException.class)
-    ProblemDetail notFound(NotFoundException ex) {
-        return problem(HttpStatus.NOT_FOUND, ex.getMessage());
+    private final MessageSource messages;
+
+    public ApiExceptionHandler(MessageSource messages) {
+        this.messages = messages;
     }
 
-    @ExceptionHandler(ConflictException.class)
-    ProblemDetail conflict(ConflictException ex) {
-        return problem(HttpStatus.CONFLICT, ex.getMessage());
-    }
-
-    @ExceptionHandler(BadRequestException.class)
-    ProblemDetail badRequest(BadRequestException ex) {
-        return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
-    }
-
-    @ExceptionHandler(UnauthorizedException.class)
-    ProblemDetail unauthorized(UnauthorizedException ex) {
-        return problem(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    @ExceptionHandler(ApiException.class)
+    ProblemDetail api(ApiException ex) {
+        HttpStatus status = switch (ex) {
+            case NotFoundException e -> HttpStatus.NOT_FOUND;
+            case ConflictException e -> HttpStatus.CONFLICT;
+            case UnauthorizedException e -> HttpStatus.UNAUTHORIZED;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return problem(status, ex.getCode(), ex.getArgs());
     }
 
     @ExceptionHandler(PropertyReferenceException.class)
     ProblemDetail invalidSort(PropertyReferenceException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Campo de ordenamiento inválido: " + ex.getPropertyName());
+        return problem(HttpStatus.BAD_REQUEST, "error.sort", ex.getPropertyName());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail integrity(DataIntegrityViolationException ex) {
         log.warn("Violación de integridad: {}", ex.getMostSpecificCause().getMessage());
-        return problem(HttpStatus.CONFLICT, "La operación viola una restricción de datos");
+        return problem(HttpStatus.CONFLICT, "error.integrity");
     }
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "Datos inválidos");
+        ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "error.validation");
         Map<String, String> errors = new LinkedHashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.putIfAbsent(error.getField(), error.getDefaultMessage());
@@ -73,12 +71,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
             MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(problem(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el tamaño máximo permitido"));
+                .body(problem(HttpStatus.PAYLOAD_TOO_LARGE, "error.uploadTooLarge"));
     }
 
-    private static ProblemDetail problem(HttpStatus status, @Nullable String detail) {
+    /** Respuesta RFC 9457 con el texto en el idioma de la petición y el código estable en "code". */
+    private ProblemDetail problem(HttpStatus status, String code, Object... args) {
+        String detail = messages.getMessage(code, args, code, LocaleContextHolder.getLocale());
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
         pd.setTitle(status.getReasonPhrase());
+        pd.setProperty("code", code);
         return pd;
     }
 }

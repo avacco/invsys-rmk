@@ -42,7 +42,7 @@ public class CategoryService {
     public CategoryResponse create(CategoryRequest request) {
         String name = request.name().trim();
         if (categories.existsByNameIgnoreCase(name)) {
-            throw new ConflictException("Ya existe una categoría con ese nombre");
+            throw new ConflictException("error.category.duplicate");
         }
         Category saved = categories.save(new Category(name, clean(request.description())));
         audit.record(AuditAction.CREATE, "category", saved.getId(), saved.getName());
@@ -53,7 +53,7 @@ public class CategoryService {
         Category category = find(id);
         String name = request.name().trim();
         if (categories.existsByNameIgnoreCaseAndIdNot(name, id)) {
-            throw new ConflictException("Ya existe una categoría con ese nombre");
+            throw new ConflictException("error.category.duplicate");
         }
         category.update(name, clean(request.description()));
         audit.record(AuditAction.UPDATE, "category", id, name);
@@ -63,14 +63,14 @@ public class CategoryService {
     public void delete(Long id) {
         Category category = find(id);
         if (products.existsByCategoryId(id)) {
-            throw new ConflictException("La categoría tiene productos asociados");
+            throw new ConflictException("error.category.inUse");
         }
         categories.delete(category);
         audit.record(AuditAction.DELETE, "category", id, category.getName());
     }
 
     private Category find(Long id) {
-        return categories.findById(id).orElseThrow(() -> new NotFoundException("Categoría", id));
+        return categories.findById(id).orElseThrow(() -> new NotFoundException("category", id));
     }
 
     private static String clean(String value) {

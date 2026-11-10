@@ -63,7 +63,7 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         String sku = request.sku().trim();
         if (products.existsBySkuIgnoreCase(sku)) {
-            throw new ConflictException("Ya existe un producto con el SKU " + sku);
+            throw new ConflictException("error.product.duplicateSku", sku);
         }
         Product product = new Product(sku);
         apply(product, request);
@@ -75,7 +75,7 @@ public class ProductService {
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = find(id);
         if (products.existsBySkuIgnoreCaseAndIdNot(request.sku().trim(), id)) {
-            throw new ConflictException("Ya existe un producto con el SKU " + request.sku().trim());
+            throw new ConflictException("error.product.duplicateSku", request.sku().trim());
         }
         apply(product, request);
         audit.record(AuditAction.UPDATE, "product", id, describe(product));
@@ -85,7 +85,7 @@ public class ProductService {
     public void delete(Long id) {
         Product product = find(id);
         if (usages.stream().anyMatch(u -> u.isInUse(id))) {
-            throw new ConflictException("El producto tiene movimientos de stock; desactivalo en lugar de eliminarlo");
+            throw new ConflictException("error.product.hasMovements");
         }
         String imageUrl = product.getImageUrl();
         products.delete(product);
@@ -116,16 +116,16 @@ public class ProductService {
     }
 
     private Product find(Long id) {
-        return products.findById(id).orElseThrow(() -> new NotFoundException("Producto", id));
+        return products.findById(id).orElseThrow(() -> new NotFoundException("product", id));
     }
 
     private void apply(Product product, ProductRequest r) {
         Category category = r.categoryId() == null ? null : categories.findById(r.categoryId())
-                .orElseThrow(() -> new BadRequestException("La categoría " + r.categoryId() + " no existe"));
+                .orElseThrow(() -> new BadRequestException("error.notFound.category", r.categoryId()));
         Unit unit = units.findById(r.unitId())
-                .orElseThrow(() -> new BadRequestException("La unidad " + r.unitId() + " no existe"));
+                .orElseThrow(() -> new BadRequestException("error.notFound.unit", r.unitId()));
         Supplier supplier = r.supplierId() == null ? null : suppliers.findById(r.supplierId())
-                .orElseThrow(() -> new BadRequestException("El proveedor " + r.supplierId() + " no existe"));
+                .orElseThrow(() -> new BadRequestException("error.notFound.supplier", r.supplierId()));
         String description = r.description() == null || r.description().isBlank() ? null : r.description().trim();
         BigDecimal minStock = r.minStock() == null ? BigDecimal.ZERO : r.minStock();
         product.update(r.sku().trim(), r.name().trim(), description, category, unit, supplier,

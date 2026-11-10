@@ -1,8 +1,8 @@
 package com.invsys.shared.web;
 
-public class BadRequestException extends RuntimeException {
+public class BadRequestException extends ApiException {
 
-    public BadRequestException(String message) {
-        super(message);
+    public BadRequestException(String code, Object... args) {
+        super(code, args);
     }
 }

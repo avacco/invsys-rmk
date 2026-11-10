@@ -6,6 +6,7 @@ import type { ValuationGroup } from '@/api/types'
 import { Card, EmptyState, ErrorState, PageHeader, Spinner, Table, Td, Th } from '@/components/ui'
 import { formatMoney, formatMoneyCompact, formatNumber, formatPercent } from '@/lib/format'
 import { useChartTheme } from './chartTheme'
+import { useTranslation } from 'react-i18next'
 
 const PERIODS = [7, 30, 90]
 
@@ -36,12 +37,13 @@ function Segmented<T extends string | number>({ value, options, onChange, label 
   onChange: (v: T) => void
   label: string
 }) {
+  const { t } = useTranslation()
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
+    <div role="group" aria-label={t(label)} className="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
       {options.map((o) => (
         <button key={String(o.value)} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}
           className={`cursor-pointer rounded-md px-3 py-1 font-medium ${o.value === value ? 'bg-white shadow-sm dark:bg-gray-900' : 'text-gray-600 dark:text-gray-300'}`}>
-          {o.label}
+          {t(o.label)}
         </button>
       ))}
     </div>
@@ -71,6 +73,7 @@ function ChartTooltip({ active, payload, label, labelFormatter }: {
 }
 
 function ActivityChart({ days }: { days: number }) {
+  const { t } = useTranslation()
   const theme = useChartTheme()
   const activity = useQuery({ queryKey: ['reports', 'activity', days], queryFn: () => reportsApi.activity(days) })
   if (activity.isPending) return <Spinner />
@@ -80,11 +83,11 @@ function ActivityChart({ days }: { days: number }) {
   return (
     <>
       <dl className="mb-4 grid grid-cols-3 gap-4">
-        <div><dt className="text-gray-500 dark:text-gray-400">Entradas</dt><dd className="text-xl font-semibold">{formatMoney(totals.in)}</dd></div>
-        <div><dt className="text-gray-500 dark:text-gray-400">Salidas</dt><dd className="text-xl font-semibold">{formatMoney(totals.out)}</dd></div>
-        <div><dt className="text-gray-500 dark:text-gray-400">Movimientos</dt><dd className="text-xl font-semibold">{totals.n}</dd></div>
+        <div><dt className="text-gray-500 dark:text-gray-400">{t('Entradas')}</dt><dd className="text-xl font-semibold">{formatMoney(totals.in)}</dd></div>
+        <div><dt className="text-gray-500 dark:text-gray-400">{t('Salidas')}</dt><dd className="text-xl font-semibold">{formatMoney(totals.out)}</dd></div>
+        <div><dt className="text-gray-500 dark:text-gray-400">{t('Movimientos')}</dt><dd className="text-xl font-semibold">{totals.n}</dd></div>
       </dl>
-      <div className="h-72" role="img" aria-label="Gráfico de barras: valor de entradas y salidas por día">
+      <div className="h-72" role="img" aria-label={t('Gráfico de barras: valor de entradas y salidas por día')}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barGap={2} barCategoryGap="20%">
             <CartesianGrid stroke={theme.grid} vertical={false} />
@@ -92,16 +95,16 @@ function ActivityChart({ days }: { days: number }) {
             <YAxis tickFormatter={formatMoneyCompact} stroke={theme.axis} tickLine={false} axisLine={false} width={56} fontSize={12} />
             <Tooltip content={<ChartTooltip labelFormatter={shortDate} />} cursor={{ fill: theme.grid, opacity: 0.4 }} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: 13, color: theme.text }} />
-            <Bar dataKey="inValue" name="Entradas" fill={theme.series[0]} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
-            <Bar dataKey="outValue" name="Salidas" fill={theme.series[1]} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            <Bar dataKey="inValue" name={t('Entradas')} fill={theme.series[0]} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
+            <Bar dataKey="outValue" name={t('Salidas')} fill={theme.series[1]} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <details className="mt-3">
-        <summary className="cursor-pointer text-blue-600 dark:text-blue-400">Ver como tabla</summary>
+        <summary className="cursor-pointer text-blue-600 dark:text-blue-400">{t('Ver como tabla')}</summary>
         <div className="mt-2 max-h-64 overflow-y-auto">
           <Table>
-            <thead><tr><Th>Día</Th><Th className="text-right">Entradas</Th><Th className="text-right">Salidas</Th><Th className="text-right">Ajustes</Th><Th className="text-right">Movimientos</Th></tr></thead>
+            <thead><tr><Th>{t('Día')}</Th><Th className="text-right">{t('Entradas')}</Th><Th className="text-right">{t('Salidas')}</Th><Th className="text-right">{t('Ajustes')}</Th><Th className="text-right">{t('Movimientos')}</Th></tr></thead>
             <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
               {data.filter((d) => d.movements > 0).map((d) => (
                 <tr key={d.date}>
@@ -121,30 +124,31 @@ function ActivityChart({ days }: { days: number }) {
 }
 
 function ValuationChart({ group }: { group: ValuationGroup }) {
+  const { t } = useTranslation()
   const theme = useChartTheme()
   const valuation = useQuery({ queryKey: ['reports', 'valuation', group], queryFn: () => reportsApi.valuation(group) })
   if (valuation.isPending) return <Spinner />
   if (valuation.isError) return <ErrorState error={valuation.error} onRetry={() => void valuation.refetch()} />
-  if (valuation.data.length === 0) return <EmptyState title="No hay stock valorizado" />
-  const rows = valuation.data.map((r) => ({ ...r, label: r.name ?? 'Sin categoría' }))
+  if (valuation.data.length === 0) return <EmptyState title={t('No hay stock valorizado')} />
+  const rows = valuation.data.map((r) => ({ ...r, label: r.name ?? t('Sin categoría') }))
   const total = rows.reduce((t, r) => t + r.costValue, 0)
   return (
     <>
-      <div style={{ height: rows.length * 40 + 16 }} role="img" aria-label="Gráfico de valor del inventario">
+      <div style={{ height: rows.length * 40 + 16 }} role="img" aria-label={t('Gráfico de valor del inventario')}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 72, bottom: 0, left: 0 }} barCategoryGap={8}>
             <XAxis type="number" hide />
             <YAxis type="category" dataKey="label" width={130} stroke={theme.axis} tickLine={false} axisLine={false} fontSize={12} />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: theme.grid, opacity: 0.4 }} />
-            <Bar dataKey="costValue" name="Valor al costo" fill={theme.series[0]} radius={[0, 4, 4, 0]} maxBarSize={22} isAnimationActive={false}>
+            <Bar dataKey="costValue" name={t('Valor al costo')} fill={theme.series[0]} radius={[0, 4, 4, 0]} maxBarSize={22} isAnimationActive={false}>
               <LabelList dataKey="costValue" position="right" formatter={(v: unknown) => formatMoneyCompact(Number(v))} fill={theme.text} fontSize={12} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
       <Table>
-        <thead><tr><Th>{group === 'CATEGORY' ? 'Categoría' : 'Almacén'}</Th><Th className="text-right">Productos</Th>
-          <Th className="text-right">Valor al costo</Th><Th className="text-right">Valor de venta</Th><Th className="text-right">% del total</Th></tr></thead>
+        <thead><tr><Th>{group === 'CATEGORY' ? 'Categoría' : 'Almacén'}</Th><Th className="text-right">{t('Productos')}</Th>
+          <Th className="text-right">{t('Valor al costo')}</Th><Th className="text-right">{t('Valor de venta')}</Th><Th className="text-right">{t('% del total')}</Th></tr></thead>
         <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
           {rows.map((r) => (
             <tr key={r.id ?? 'none'}>
@@ -162,13 +166,14 @@ function ValuationChart({ group }: { group: ValuationGroup }) {
 }
 
 function TopProducts({ days }: { days: number }) {
+  const { t } = useTranslation()
   const top = useQuery({ queryKey: ['reports', 'top', days], queryFn: () => reportsApi.topProducts(days, 10) })
   if (top.isPending) return <Spinner />
   if (top.isError) return <ErrorState error={top.error} onRetry={() => void top.refetch()} />
-  if (top.data.length === 0) return <EmptyState title="No hubo salidas en el período" />
+  if (top.data.length === 0) return <EmptyState title={t('No hubo salidas en el período')} />
   return (
     <Table>
-      <thead><tr><Th>#</Th><Th>Producto</Th><Th className="text-right">Cantidad</Th><Th className="text-right">Valor al costo</Th><Th className="text-right">Salidas</Th></tr></thead>
+      <thead><tr><Th>#</Th><Th>{t('Producto')}</Th><Th className="text-right">{t('Cantidad')}</Th><Th className="text-right">{t('Valor al costo')}</Th><Th className="text-right">{t('Salidas')}</Th></tr></thead>
       <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
         {top.data.map((t, i) => (
           <tr key={t.product.id}>
@@ -185,24 +190,25 @@ function TopProducts({ days }: { days: number }) {
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation()
   const [days, setDays] = useState(30)
   const [group, setGroup] = useState<ValuationGroup>('CATEGORY')
-  const periodOptions = PERIODS.map((d) => ({ value: d, label: `${d} días` }))
+  const periodOptions = PERIODS.map((d) => ({ value: d, label: t('{{count}} días', { count: d }) }))
   return (
     <>
-      <PageHeader title="Reportes" description="Valores calculados con el costo actual de cada producto."
-        actions={<Segmented label="Período" value={days} options={periodOptions} onChange={setDays} />} />
+      <PageHeader title={t('Reportes')} description={t('Valores calculados con el costo actual de cada producto.')}
+        actions={<Segmented label={t('Período')} value={days} options={periodOptions} onChange={setDays} />} />
       <div className="grid gap-6">
-        <Section title="Actividad" description={`Valor de las entradas y salidas por día, últimos ${days} días.`}>
+        <Section title={t('Actividad')} description={t('Valor de las entradas y salidas por día, últimos {{count}} días.', { count: days })}>
           <ActivityChart days={days} />
         </Section>
         <div className="grid gap-6 xl:grid-cols-2">
-          <Section title="Valor del inventario" description="Stock actual valorizado al costo."
-            actions={<Segmented label="Agrupar por" value={group} onChange={setGroup}
-              options={[{ value: 'CATEGORY', label: 'Categoría' }, { value: 'WAREHOUSE', label: 'Almacén' }]} />}>
+          <Section title={t('Valor del inventario')} description={t('Stock actual valorizado al costo.')}
+            actions={<Segmented label={t('Agrupar por')} value={group} onChange={setGroup}
+              options={[{ value: 'CATEGORY', label: t('Categoría') }, { value: 'WAREHOUSE', label: t('Almacén') }]} />}>
             <ValuationChart group={group} />
           </Section>
-          <Section title="Productos con más salidas" description={`Ordenados por valor al costo, últimos ${days} días.`}>
+          <Section title={t('Productos con más salidas')} description={t('Ordenados por valor al costo, últimos {{count}} días.', { count: days })}>
             <TopProducts days={days} />
           </Section>
         </div>

@@ -11,16 +11,19 @@ import { RowActions } from '@/components/RowActions'
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td, Th } from '@/components/ui'
 import { handleApiError } from '@/lib/errors'
 import { toast } from '@/store/toast'
+import { useTranslation } from 'react-i18next'
+import { tk } from '@/i18n'
 
 const schema = z.object({
-  code: z.string().trim().min(1, 'El código es obligatorio').max(32).regex(/^[A-Za-z0-9_-]+$/, 'Solo letras, números, guion y guion bajo'),
-  name: z.string().trim().min(1, 'El nombre es obligatorio').max(100),
+  code: z.string().trim().min(1, tk('El código es obligatorio')).max(32).regex(/^[A-Za-z0-9_-]+$/, tk('Solo letras, números, guion y guion bajo')),
+  name: z.string().trim().min(1, tk('El nombre es obligatorio')).max(100),
   address: z.string().trim().max(255),
   active: z.boolean(),
 })
 type Values = z.infer<typeof schema>
 
 function WarehouseForm({ open, warehouse, onClose }: { open: boolean; warehouse: Warehouse | null; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<Values>({ resolver: zodResolver(schema) })
   useEffect(() => {
@@ -36,31 +39,32 @@ function WarehouseForm({ open, warehouse, onClose }: { open: boolean; warehouse:
   const onSubmit = handleSubmit(async (v) => {
     try {
       await save.mutateAsync(v)
-      toast.success(warehouse ? 'Almacén actualizado' : 'Almacén creado')
+      toast.success(warehouse ? t('Almacén actualizado') : t('Almacén creado'))
       onClose()
     } catch (e) {
       handleApiError(e, setError)
     }
   })
   return (
-    <Modal open={open} title={warehouse ? 'Editar almacén' : 'Nuevo almacén'} onClose={onClose}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" form="warehouse-form" loading={save.isPending}>Guardar</Button></>}>
+    <Modal open={open} title={warehouse ? t('Editar almacén') : t('Nuevo almacén')} onClose={onClose}
+      footer={<><Button variant="secondary" onClick={onClose}>{t('Cancelar')}</Button><Button type="submit" form="warehouse-form" loading={save.isPending}>{t('Guardar')}</Button></>}>
       <form id="warehouse-form" onSubmit={onSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
-        <Field label="Código" htmlFor="w-code" error={errors.code?.message}><Input id="w-code" className="uppercase" {...register('code')} /></Field>
-        <Field label="Estado" htmlFor="w-active">
+        <Field label={t('Código')} htmlFor="w-code" error={errors.code?.message}><Input id="w-code" className="uppercase" {...register('code')} /></Field>
+        <Field label={t('Estado')} htmlFor="w-active">
           <Select id="w-active" {...register('active', { setValueAs: (v) => v === true || v === 'true' })}>
-            <option value="true">Activo</option>
-            <option value="false">Inactivo</option>
+            <option value="true">{t('Activo')}</option>
+            <option value="false">{t('Inactivo')}</option>
           </Select>
         </Field>
-        <Field label="Nombre" htmlFor="w-name" error={errors.name?.message} className="sm:col-span-2"><Input id="w-name" {...register('name')} /></Field>
-        <Field label="Dirección" htmlFor="w-address" error={errors.address?.message} className="sm:col-span-2"><Input id="w-address" {...register('address')} /></Field>
+        <Field label={t('Nombre')} htmlFor="w-name" error={errors.name?.message} className="sm:col-span-2"><Input id="w-name" {...register('name')} /></Field>
+        <Field label={t('Dirección')} htmlFor="w-address" error={errors.address?.message} className="sm:col-span-2"><Input id="w-address" {...register('address')} /></Field>
       </form>
     </Modal>
   )
 }
 
 export default function WarehousesPage() {
+  const { t } = useTranslation()
   const { can } = useAuth()
   const canWrite = can('inventory:write')
   const qc = useQueryClient()
@@ -84,19 +88,19 @@ export default function WarehousesPage() {
 
   return (
     <>
-      <PageHeader title="Almacenes" description="Lugares físicos donde se guarda la mercadería."
-        actions={canWrite && <Button onClick={() => { setEditing(null); setOpen(true) }} icon={<Plus className="h-4 w-4" />}>Nuevo almacén</Button>} />
+      <PageHeader title={t('Almacenes')} description={t('Lugares físicos donde se guarda la mercadería.')}
+        actions={canWrite && <Button onClick={() => { setEditing(null); setOpen(true) }} icon={<Plus className="h-4 w-4" />}>{t('Nuevo almacén')}</Button>} />
       {list.isPending ? <Spinner /> : list.isError ? <ErrorState error={list.error} onRetry={() => void list.refetch()} /> :
-        list.data.length === 0 ? <EmptyState title="No hay almacenes" /> : (
+        list.data.length === 0 ? <EmptyState title={t('No hay almacenes')} /> : (
           <Table>
-            <thead><tr><Th>Código</Th><Th>Nombre</Th><Th>Dirección</Th><Th>Estado</Th>{canWrite && <Th />}</tr></thead>
+            <thead><tr><Th>{t('Código')}</Th><Th>{t('Nombre')}</Th><Th>{t('Dirección')}</Th><Th>{t('Estado')}</Th>{canWrite && <Th />}</tr></thead>
             <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
               {list.data.map((w) => (
                 <tr key={w.id}>
                   <Td className="font-mono">{w.code}</Td>
                   <Td className="font-medium">{w.name}</Td>
                   <Td className="text-gray-500 dark:text-gray-400">{w.address ?? '—'}</Td>
-                  <Td>{w.active ? <Badge tone="green">Activo</Badge> : <Badge>Inactivo</Badge>}</Td>
+                  <Td>{w.active ? <Badge tone="green">{t('Activo')}</Badge> : <Badge>{t('Inactivo')}</Badge>}</Td>
                   {canWrite && <Td><RowActions label={w.name} onEdit={() => { setEditing(w); setOpen(true) }} onDelete={() => setDeleting(w)} /></Td>}
                 </tr>
               ))}
@@ -104,8 +108,8 @@ export default function WarehousesPage() {
           </Table>
         )}
       <WarehouseForm open={open} warehouse={editing} onClose={() => setOpen(false)} />
-      <ConfirmDialog open={deleting !== null} title="Eliminar almacén" loading={remove.isPending}
-        message={<>¿Eliminar <strong>{deleting?.name}</strong>? Si tiene movimientos, conviene desactivarlo.</>}
+      <ConfirmDialog open={deleting !== null} title={t('Eliminar almacén')} loading={remove.isPending}
+        message={t('¿Eliminar «{{name}}»? Si tiene movimientos, conviene desactivarlo.', { name: deleting?.name })}
         onConfirm={() => void confirmDelete()} onCancel={() => setDeleting(null)} />
     </>
   )

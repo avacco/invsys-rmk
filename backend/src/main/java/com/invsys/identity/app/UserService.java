@@ -49,12 +49,12 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public User getByUsername(String username) {
-        return users.findByUsername(username).orElseThrow(() -> new NotFoundException("Usuario", username));
+        return users.findByUsername(username).orElseThrow(() -> new NotFoundException("user", username));
     }
 
     public UserResponse create(CreateUserRequest request) {
         if (users.existsByUsernameIgnoreCase(request.username())) {
-            throw new ConflictException("Ya existe un usuario con ese nombre");
+            throw new ConflictException("error.user.duplicate");
         }
         User user = new User(request.username(), passwordEncoder.encode(request.password()),
                 request.displayName(), blankToNull(request.email()), findRole(request.roleId()));
@@ -71,7 +71,7 @@ public class UserService {
         boolean self = user.getUsername().equals(currentUsername);
         Role role = findRole(request.roleId());
         if (self && (!request.enabled() || !role.getId().equals(user.getRole().getId()))) {
-            throw new BadRequestException("No podés desactivarte ni cambiar tu propio rol");
+            throw new BadRequestException("error.user.selfChange");
         }
         user.update(request.displayName(), blankToNull(request.email()), role, request.enabled());
         if (request.password() != null && !request.password().isBlank()) {
@@ -90,18 +90,18 @@ public class UserService {
     public void delete(Long id, String currentUsername) {
         User user = find(id);
         if (user.getUsername().equals(currentUsername)) {
-            throw new BadRequestException("No podés eliminar tu propio usuario");
+            throw new BadRequestException("error.user.selfDelete");
         }
         users.delete(user);
         audit.record(AuditAction.DELETE, "user", id, user.getUsername());
     }
 
     private User find(Long id) {
-        return users.findById(id).orElseThrow(() -> new NotFoundException("Usuario", id));
+        return users.findById(id).orElseThrow(() -> new NotFoundException("user", id));
     }
 
     private Role findRole(Long id) {
-        return roles.findById(id).orElseThrow(() -> new BadRequestException("El rol " + id + " no existe"));
+        return roles.findById(id).orElseThrow(() -> new BadRequestException("error.notFound.role", id));
     }
 
     private static String blankToNull(String value) {

@@ -21,6 +21,18 @@ export default defineConfig(({ mode }) => {
         '/files': env.API_PROXY_TARGET || 'http://localhost:8080',
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Dependencias en chunks propios: el navegador las cachea entre versiones de la app.
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-router'],
+            data: ['@tanstack/react-query', 'react-hook-form', '@hookform/resolvers', 'zod'],
+            i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          },
+        },
+      },
+    },
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],

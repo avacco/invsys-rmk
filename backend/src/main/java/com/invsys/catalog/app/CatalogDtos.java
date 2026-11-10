@@ -48,7 +48,7 @@ public final class CatalogDtos {
 
     public record ProductRequest(
             @NotBlank @Size(max = 64) @Pattern(regexp = "^[A-Za-z0-9._-]+$",
-                    message = "solo letras, números, punto, guion y guion bajo") String sku,
+                    message = "{validation.code}") String sku,
             @NotBlank @Size(max = 150) String name,
             @Size(max = 4000) String description,
             Long categoryId,

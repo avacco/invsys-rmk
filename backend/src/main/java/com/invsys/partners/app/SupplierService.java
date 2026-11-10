@@ -67,14 +67,14 @@ public class SupplierService {
     public void delete(Long id) {
         Supplier supplier = find(id);
         if (usage.isInUse(id)) {
-            throw new ConflictException("El proveedor tiene productos asociados; desactivalo en lugar de eliminarlo");
+            throw new ConflictException("error.supplier.inUse");
         }
         suppliers.delete(supplier);
         audit.record(AuditAction.DELETE, "supplier", id, supplier.getName());
     }
 
     private Supplier find(Long id) {
-        return suppliers.findById(id).orElseThrow(() -> new NotFoundException("Proveedor", id));
+        return suppliers.findById(id).orElseThrow(() -> new NotFoundException("supplier", id));
     }
 
     private static void apply(Supplier s, SupplierRequest r) {

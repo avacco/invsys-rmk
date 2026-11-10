@@ -1,8 +1,9 @@
 package com.invsys.shared.web;
 
-public class NotFoundException extends RuntimeException {
+public class NotFoundException extends ApiException {
 
-    public NotFoundException(String resource, Object id) {
-        super("%s %s no existe".formatted(resource, id));
+    /** entity: product, category, unit, supplier, warehouse, user, role. */
+    public NotFoundException(String entity, Object id) {
+        super("error.notFound." + entity, id);
     }
 }

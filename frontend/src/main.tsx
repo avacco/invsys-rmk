@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { isDemo } from './lib/demo'
+import './i18n'
 import './index.css'
 
 /** En modo demo se inicia MSW antes de renderizar, para que ninguna petición llegue a la red. */

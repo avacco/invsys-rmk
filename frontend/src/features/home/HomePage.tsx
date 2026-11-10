@@ -6,6 +6,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { Badge, Card, PageHeader } from '@/components/ui'
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { MOVEMENT_LABELS } from '@/features/inventory/labels'
+import { useTranslation } from 'react-i18next'
 
 function Kpi({ label, value, icon: Icon, to, tone = 'blue' }: { label: string; value?: string | number; icon: LucideIcon; to: string; tone?: 'blue' | 'amber' }) {
   const tones = {
@@ -26,6 +27,7 @@ function Kpi({ label, value, icon: Icon, to, tone = 'blue' }: { label: string; v
 }
 
 export default function HomePage() {
+  const { t } = useTranslation()
   const { user, can } = useAuth()
   const canInventory = can('inventory:read')
   const canCatalog = can('catalog:read')
@@ -44,24 +46,24 @@ export default function HomePage() {
   const s = summary.data
   return (
     <>
-      <PageHeader title={`Hola, ${user?.displayName ?? ''}`} description="Resumen del inventario." />
+      <PageHeader title={t('Hola, {{name}}', { name: user?.displayName ?? '' })} description={t('Resumen del inventario.')} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {canInventory && <Kpi label="Valor del inventario (al costo)" value={s && formatMoney(s.inventoryValue)} icon={DollarSign} to="/inventory" />}
-        {canInventory && <Kpi label="Productos con stock bajo" value={s?.lowStockProducts} icon={AlertTriangle} to="/inventory" tone={s && s.lowStockProducts > 0 ? 'amber' : 'blue'} />}
-        {canInventory && <Kpi label="Movimientos (7 días)" value={s?.movementsLast7Days} icon={ArrowLeftRight} to="/inventory/movements" />}
-        {canInventory && <Kpi label="Almacenes activos" value={s?.activeWarehouses} icon={Warehouse} to="/warehouses" />}
-        {canCatalog && <Kpi label="Productos activos" value={products.data?.totalElements} icon={Package} to="/products" />}
-        {canPartners && <Kpi label="Proveedores activos" value={suppliers.data?.totalElements} icon={Truck} to="/suppliers" />}
+        {canInventory && <Kpi label={t('Valor del inventario (al costo)')} value={s && formatMoney(s.inventoryValue)} icon={DollarSign} to="/inventory" />}
+        {canInventory && <Kpi label={t('Productos con stock bajo')} value={s?.lowStockProducts} icon={AlertTriangle} to="/inventory" tone={s && s.lowStockProducts > 0 ? 'amber' : 'blue'} />}
+        {canInventory && <Kpi label={t('Movimientos (7 días)')} value={s?.movementsLast7Days} icon={ArrowLeftRight} to="/inventory/movements" />}
+        {canInventory && <Kpi label={t('Almacenes activos')} value={s?.activeWarehouses} icon={Warehouse} to="/warehouses" />}
+        {canCatalog && <Kpi label={t('Productos activos')} value={products.data?.totalElements} icon={Package} to="/products" />}
+        {canPartners && <Kpi label={t('Proveedores activos')} value={suppliers.data?.totalElements} icon={Truck} to="/suppliers" />}
       </div>
 
       {canInventory && (
         <div className="mt-8 grid gap-6 xl:grid-cols-2">
           <Card className="p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Stock bajo</h2>
-              <Link to="/inventory" className="text-blue-600 hover:underline dark:text-blue-400">Ver stock</Link>
+              <h2 className="text-lg font-semibold">{t('Stock bajo')}</h2>
+              <Link to="/inventory" className="text-blue-600 hover:underline dark:text-blue-400">{t('Ver stock')}</Link>
             </div>
-            {low.data?.content.length === 0 && <p className="text-gray-500">Todos los productos están por encima del mínimo.</p>}
+            {low.data?.content.length === 0 && <p className="text-gray-500">{t('Todos los productos están por encima del mínimo.')}</p>}
             <ul className="divide-y divide-gray-100 dark:divide-gray-700">
               {low.data?.content.map((r) => (
                 <li key={r.product.id} className="flex items-center justify-between py-2">
@@ -73,15 +75,15 @@ export default function HomePage() {
           </Card>
           <Card className="p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Últimos movimientos</h2>
-              <Link to="/inventory/movements" className="text-blue-600 hover:underline dark:text-blue-400">Ver todos</Link>
+              <h2 className="text-lg font-semibold">{t('Últimos movimientos')}</h2>
+              <Link to="/inventory/movements" className="text-blue-600 hover:underline dark:text-blue-400">{t('Ver todos')}</Link>
             </div>
-            {recent.data?.content.length === 0 && <p className="text-gray-500">Todavía no hay movimientos.</p>}
+            {recent.data?.content.length === 0 && <p className="text-gray-500">{t('Todavía no hay movimientos.')}</p>}
             <ul className="divide-y divide-gray-100 dark:divide-gray-700">
               {recent.data?.content.map((m) => (
                 <li key={m.id} className="flex items-center justify-between gap-2 py-2">
                   <span className="min-w-0 truncate">
-                    <span className="font-medium">{MOVEMENT_LABELS[m.type]}</span> · {m.product.name} · {m.warehouse.name}
+                    <span className="font-medium">{t(MOVEMENT_LABELS[m.type])}</span> · {m.product.name} · {m.warehouse.name}
                     <span className="block text-xs text-gray-500">{formatDateTime(m.createdAt)} · {m.createdBy}</span>
                   </span>
                   <span className={`whitespace-nowrap font-semibold ${m.quantity > 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>

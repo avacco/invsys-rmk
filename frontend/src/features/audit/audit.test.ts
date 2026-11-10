@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { auditApi, authApi, categoriesApi, inventoryApi, reportsApi } from '@/api/endpoints'
+import i18n from '@/i18n'
 import { formatSummary } from './labels'
 
 describe('auditoría (demo)', () => {
@@ -34,7 +35,7 @@ describe('auditoría (demo)', () => {
     await inventoryApi.register({ type: 'OUT', productId: 1, warehouseId: 1, quantity: 2 })
     const [entry] = (await auditApi.list({ action: 'STOCK_MOVEMENT' })).content
     expect(entry.summary).toBe('OUT · -2 u · Aceite de oliva 500 ml (ALI-001) · Almacén principal')
-    expect(formatSummary(entry.action, entry.summary)).toMatch(/^Salida · -2 u/)
+    expect(formatSummary(i18n.t, entry.summary)).toMatch(/^Salida · -2 u/)
   })
 
   it('solo ADMIN puede ver la auditoría', async () => {

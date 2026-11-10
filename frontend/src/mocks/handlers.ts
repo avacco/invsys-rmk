@@ -1,4 +1,5 @@
 import { http, HttpResponse, type PathParams } from 'msw'
+import i18n from '@/i18n'
 import { API_BASE } from '@/api/client'
 import type {
   ActivityDay, AuditAction, AuditEntry, TopProduct, ValuationRow,
@@ -19,17 +20,23 @@ const url = (path: string) => `${base}${path}`
 
 // ---------- utilidades ----------
 
-function problem(status: number, detail: string, errors?: Record<string, string>) {
-  return HttpResponse.json({ status, title: detail, detail, ...(errors ? { errors } : {}) }, { status })
+/** Mensaje traducible: texto en español (clave de i18n) y, si hace falta, sus variables. */
+type Message = string | [string, Record<string, unknown>]
+
+/** Como el backend real, responde los errores en el idioma de la interfaz. */
+function problem(status: number, detail: Message, errors?: Record<string, string>) {
+  const message = Array.isArray(detail) ? i18n.t(detail[0], detail[1]) : i18n.t(detail)
+  const translatedErrors = errors && Object.fromEntries(Object.entries(errors).map(([k, v]) => [k, i18n.t(v)]))
+  return HttpResponse.json({ status, title: message, detail: message, ...(translatedErrors ? { errors: translatedErrors } : {}) }, { status })
 }
 
 class HttpError extends Error {
-  constructor(readonly status: number, message: string, readonly errors?: Record<string, string>) {
-    super(message)
+  constructor(readonly status: number, readonly detail: Message, readonly errors?: Record<string, string>) {
+    super(Array.isArray(detail) ? detail[0] : detail)
   }
 }
 
-const fail = (status: number, message: string, errors?: Record<string, string>): never => {
+const fail = (status: number, message: Message, errors?: Record<string, string>): never => {
   throw new HttpError(status, message, errors)
 }
 
@@ -108,7 +115,7 @@ function guarded(permission: PermissionValue | PermissionValue[] | null, handler
     if (!user) return problem(401, 'Sesión no iniciada')
     const required = permission === null ? [] : Array.isArray(permission) ? permission : [permission]
     if (required.length > 0 && !required.some((p) => permissionsOf(user).includes(p))) {
-      return problem(403, 'No tenés permiso para esta operación')
+      return problem(403, 'No tienes permiso para esta operación')
     }
     try {
       const segments = new URL(request.url).pathname.split('/')
@@ -119,7 +126,7 @@ function guarded(permission: PermissionValue | PermissionValue[] | null, handler
       persist()
       return response
     } catch (e) {
-      if (e instanceof HttpError) return problem(e.status, e.message, e.errors)
+      if (e instanceof HttpError) return problem(e.status, e.detail, e.errors)
       throw e
     }
   }
@@ -195,9 +202,9 @@ function validateProduct(body: ProductRequest) {
 
 function buildProduct(body: ProductRequest, existing: Product | undefined, by: string): Product {
   const db = getDb()
-  const category = body.categoryId ? db.categories.find((c) => c.id === body.categoryId) ?? fail(400, `La categoría ${body.categoryId} no existe`) : undefined
-  const unit = db.units.find((u) => u.id === body.unitId) ?? fail(400, `La unidad ${body.unitId} no existe`)
-  const supplier = body.supplierId ? db.suppliers.find((s) => s.id === body.supplierId) ?? fail(400, `El proveedor ${body.supplierId} no existe`) : undefined
+  const category = body.categoryId ? db.categories.find((c) => c.id === body.categoryId) ?? fail(400, ['La categoría {{v0}} no existe', { v0: body.categoryId }]) : undefined
+  const unit = db.units.find((u) => u.id === body.unitId) ?? fail(400, ['La unidad {{v0}} no existe', { v0: body.unitId }])
+  const supplier = body.supplierId ? db.suppliers.find((s) => s.id === body.supplierId) ?? fail(400, ['El proveedor {{v0}} no existe', { v0: body.supplierId }]) : undefined
   return {
     id: existing?.id ?? nextId(),
     sku: body.sku.trim(),
@@ -284,7 +291,7 @@ const baseHandlers = [
 
   http.get(url('/products/:id'), guarded('catalog:read', ({ params }) => {
     const product = getDb().products.find((p) => p.id === idParam(params))
-    return product ? HttpResponse.json(product) : problem(404, `Producto ${params.id} no existe`)
+    return product ? HttpResponse.json(product) : problem(404, ['Producto {{v0}} no existe', { v0: params.id }])
   })),
 
   http.post(url('/products'), guarded('catalog:write', async ({ request, user }) => {
@@ -292,7 +299,7 @@ const baseHandlers = [
     validateProduct(body)
     const db = getDb()
     if (db.products.some((p) => p.sku.toLowerCase() === body.sku.trim().toLowerCase())) {
-      fail(409, `Ya existe un producto con el SKU ${body.sku.trim()}`)
+      fail(409, ['Ya existe un producto con el SKU {{v0}}', { v0: body.sku.trim() }])
     }
     const product = buildProduct(body, undefined, user.username)
     db.products.push(product)
@@ -302,11 +309,11 @@ const baseHandlers = [
   http.put(url('/products/:id'), guarded('catalog:write', async ({ request, params, user }) => {
     const db = getDb()
     const index = db.products.findIndex((p) => p.id === idParam(params))
-    if (index < 0) fail(404, `Producto ${params.id} no existe`)
+    if (index < 0) fail(404, ['Producto {{v0}} no existe', { v0: params.id }])
     const body = (await request.json()) as ProductRequest
     validateProduct(body)
     if (db.products.some((p) => p.id !== idParam(params) && p.sku.toLowerCase() === body.sku.trim().toLowerCase())) {
-      fail(409, `Ya existe un producto con el SKU ${body.sku.trim()}`)
+      fail(409, ['Ya existe un producto con el SKU {{v0}}', { v0: body.sku.trim() }])
     }
     db.products[index] = touch(buildProduct(body, db.products[index], user.username), user.username)
     return HttpResponse.json(db.products[index])
@@ -314,27 +321,27 @@ const baseHandlers = [
 
   http.delete(url('/products/:id'), guarded('catalog:write', ({ params }) => {
     const db = getDb()
-    if (!db.products.some((p) => p.id === idParam(params))) fail(404, `Producto ${params.id} no existe`)
+    if (!db.products.some((p) => p.id === idParam(params))) fail(404, ['Producto {{v0}} no existe', { v0: params.id }])
     if (db.movements.some((m) => m.product.id === idParam(params))) {
-      fail(409, 'El producto tiene movimientos de stock; desactivalo en lugar de eliminarlo')
+      fail(409, 'El producto tiene movimientos de stock; desactívalo en lugar de eliminarlo')
     }
     db.products = db.products.filter((p) => p.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
   })),
 
   http.post(url('/products/:id/image'), guarded('catalog:write', async ({ request, params, user }) => {
-    const product = getDb().products.find((p) => p.id === idParam(params)) ?? fail(404, `Producto ${params.id} no existe`)
+    const product = getDb().products.find((p) => p.id === idParam(params)) ?? fail(404, ['Producto {{v0}} no existe', { v0: params.id }])
     const file = (await request.formData()).get('file')
     if (!(file instanceof File) || file.size === 0) fail(400, 'El archivo está vacío')
     const image = file as File
-    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(image.type)) fail(400, 'Formato no soportado. Usá PNG, JPG, WEBP o GIF')
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(image.type)) fail(400, 'Formato no soportado. Usa PNG, JPG, WEBP o GIF')
     if (image.size > 5 * 1024 * 1024) fail(400, 'La imagen supera los 5 MB')
     product.imageUrl = await fileToDataUrl(image)
     return HttpResponse.json(touch(product, user.username))
   })),
 
   http.delete(url('/products/:id/image'), guarded('catalog:write', ({ params, user }) => {
-    const product = getDb().products.find((p) => p.id === idParam(params)) ?? fail(404, `Producto ${params.id} no existe`)
+    const product = getDb().products.find((p) => p.id === idParam(params)) ?? fail(404, ['Producto {{v0}} no existe', { v0: params.id }])
     product.imageUrl = undefined
     return HttpResponse.json(touch(product, user.username))
   })),
@@ -355,7 +362,7 @@ const baseHandlers = [
 
   http.put(url('/categories/:id'), guarded('catalog:write', async ({ request, params, user }) => {
     const db = getDb()
-    const category = db.categories.find((c) => c.id === idParam(params)) ?? fail(404, `Categoría ${params.id} no existe`)
+    const category = db.categories.find((c) => c.id === idParam(params)) ?? fail(404, ['Categoría {{v0}} no existe', { v0: params.id }])
     const body = (await request.json()) as CategoryRequest
     requireFields({ name: !body.name?.trim() && 'no debe estar vacío' })
     if (db.categories.some((c) => c.id !== category.id && c.name.toLowerCase() === body.name.trim().toLowerCase())) fail(409, 'Ya existe una categoría con ese nombre')
@@ -367,7 +374,7 @@ const baseHandlers = [
 
   http.delete(url('/categories/:id'), guarded('catalog:write', ({ params }) => {
     const db = getDb()
-    if (!db.categories.some((c) => c.id === idParam(params))) fail(404, `Categoría ${params.id} no existe`)
+    if (!db.categories.some((c) => c.id === idParam(params))) fail(404, ['Categoría {{v0}} no existe', { v0: params.id }])
     if (db.products.some((p) => p.category?.id === idParam(params))) fail(409, 'La categoría tiene productos asociados')
     db.categories = db.categories.filter((c) => c.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
@@ -389,7 +396,7 @@ const baseHandlers = [
 
   http.put(url('/units/:id'), guarded('catalog:write', async ({ request, params }) => {
     const db = getDb()
-    const unit = db.units.find((u) => u.id === idParam(params)) ?? fail(404, `Unidad ${params.id} no existe`)
+    const unit = db.units.find((u) => u.id === idParam(params)) ?? fail(404, ['Unidad {{v0}} no existe', { v0: params.id }])
     const body = (await request.json()) as UnitRequest
     if (db.units.some((u) => u.id !== unit.id && u.code.toLowerCase() === body.code.trim().toLowerCase())) fail(409, 'Ya existe una unidad con ese código')
     Object.assign(unit, { code: body.code.trim(), name: body.name.trim(), decimals: body.decimals })
@@ -399,7 +406,7 @@ const baseHandlers = [
 
   http.delete(url('/units/:id'), guarded('catalog:write', ({ params }) => {
     const db = getDb()
-    if (!db.units.some((u) => u.id === idParam(params))) fail(404, `Unidad ${params.id} no existe`)
+    if (!db.units.some((u) => u.id === idParam(params))) fail(404, ['Unidad {{v0}} no existe', { v0: params.id }])
     if (db.products.some((p) => p.unit.id === idParam(params))) fail(409, 'La unidad está en uso')
     db.units = db.units.filter((u) => u.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
@@ -425,7 +432,7 @@ const baseHandlers = [
   http.put(url('/suppliers/:id'), guarded('partners:write', async ({ request, params, user }) => {
     const db = getDb()
     const index = db.suppliers.findIndex((s) => s.id === idParam(params))
-    if (index < 0) fail(404, `Proveedor ${params.id} no existe`)
+    if (index < 0) fail(404, ['Proveedor {{v0}} no existe', { v0: params.id }])
     const supplier = touch(buildSupplier((await request.json()) as SupplierRequest, db.suppliers[index], user.username), user.username)
     db.suppliers[index] = supplier
     for (const p of db.products) if (p.supplier?.id === supplier.id) p.supplier = { id: supplier.id, name: supplier.name }
@@ -434,9 +441,9 @@ const baseHandlers = [
 
   http.delete(url('/suppliers/:id'), guarded('partners:write', ({ params }) => {
     const db = getDb()
-    if (!db.suppliers.some((s) => s.id === idParam(params))) fail(404, `Proveedor ${params.id} no existe`)
+    if (!db.suppliers.some((s) => s.id === idParam(params))) fail(404, ['Proveedor {{v0}} no existe', { v0: params.id }])
     if (db.products.some((p) => p.supplier?.id === idParam(params))) {
-      fail(409, 'El proveedor tiene productos asociados; desactivalo en lugar de eliminarlo')
+      fail(409, 'El proveedor tiene productos asociados; desactívalo en lugar de eliminarlo')
     }
     db.suppliers = db.suppliers.filter((s) => s.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
@@ -455,7 +462,7 @@ const baseHandlers = [
     })
     const db = getDb()
     if (db.users.some((u) => u.username.toLowerCase() === body.username.toLowerCase())) fail(409, 'Ya existe un usuario con ese nombre')
-    const role = db.roles.find((r) => r.id === body.roleId) ?? fail(400, `El rol ${body.roleId} no existe`)
+    const role = db.roles.find((r) => r.id === body.roleId) ?? fail(400, ['El rol {{v0}} no existe', { v0: body.roleId }])
     const created: DemoUser = {
       id: nextId(), username: body.username, password: body.password, displayName: body.displayName.trim(),
       email: blank(body.email), role: { id: role.id, name: role.name }, enabled: body.enabled ?? true, audit: audit(user.username),
@@ -466,10 +473,10 @@ const baseHandlers = [
 
   http.put(url('/users/:id'), guarded('users:write', async ({ request, params, user }) => {
     const db = getDb()
-    const target = db.users.find((u) => u.id === idParam(params)) ?? fail(404, `Usuario ${params.id} no existe`)
+    const target = db.users.find((u) => u.id === idParam(params)) ?? fail(404, ['Usuario {{v0}} no existe', { v0: params.id }])
     const body = (await request.json()) as UpdateUserRequest
-    const role = db.roles.find((r) => r.id === body.roleId) ?? fail(400, `El rol ${body.roleId} no existe`)
-    if (target.id === user.id && (!body.enabled || role.id !== target.role.id)) fail(400, 'No podés desactivarte ni cambiar tu propio rol')
+    const role = db.roles.find((r) => r.id === body.roleId) ?? fail(400, ['El rol {{v0}} no existe', { v0: body.roleId }])
+    if (target.id === user.id && (!body.enabled || role.id !== target.role.id)) fail(400, 'No puedes desactivarte ni cambiar tu propio rol')
     Object.assign(target, { displayName: body.displayName.trim(), email: blank(body.email), role: { id: role.id, name: role.name }, enabled: body.enabled })
     if (body.password) target.password = body.password
     return HttpResponse.json(publicUser(touch(target, user.username)))
@@ -477,8 +484,8 @@ const baseHandlers = [
 
   http.delete(url('/users/:id'), guarded('users:write', ({ params, user }) => {
     const db = getDb()
-    if (!db.users.some((u) => u.id === idParam(params))) fail(404, `Usuario ${params.id} no existe`)
-    if (idParam(params) === user.id) fail(400, 'No podés eliminar tu propio usuario')
+    if (!db.users.some((u) => u.id === idParam(params))) fail(404, ['Usuario {{v0}} no existe', { v0: params.id }])
+    if (idParam(params) === user.id) fail(400, 'No puedes eliminar tu propio usuario')
     db.users = db.users.filter((u) => u.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
   })),
@@ -503,7 +510,7 @@ const baseHandlers = [
 
   http.put(url('/roles/:id'), guarded('roles:write', async ({ request, params, user }) => {
     const db = getDb()
-    const role = db.roles.find((r) => r.id === idParam(params)) ?? fail(404, `Rol ${params.id} no existe`)
+    const role = db.roles.find((r) => r.id === idParam(params)) ?? fail(404, ['Rol {{v0}} no existe', { v0: params.id }])
     if (role.system) fail(400, 'Los roles de sistema no se pueden modificar')
     const body = (await request.json()) as RoleRequest
     validateRole(body)
@@ -515,7 +522,7 @@ const baseHandlers = [
 
   http.delete(url('/roles/:id'), guarded('roles:write', ({ params }) => {
     const db = getDb()
-    const role = db.roles.find((r) => r.id === idParam(params)) ?? fail(404, `Rol ${params.id} no existe`)
+    const role = db.roles.find((r) => r.id === idParam(params)) ?? fail(404, ['Rol {{v0}} no existe', { v0: params.id }])
     if (role.system) fail(400, 'Los roles de sistema no se pueden eliminar')
     if (db.users.some((u) => u.role.id === role.id)) fail(409, 'El rol tiene usuarios asignados')
     db.roles = db.roles.filter((r) => r.id !== role.id)
@@ -538,8 +545,8 @@ function stockOf(productId: number, warehouseId: number) {
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
 function activeWarehouse(id: number | null | undefined): Warehouse {
-  const w = getDb().warehouses.find((x) => x.id === id) ?? fail(400, `El almacén ${id} no existe`)
-  if (!w.active) fail(400, `El almacén ${w.name} está inactivo`)
+  const w = getDb().warehouses.find((x) => x.id === id) ?? fail(400, ['El almacén {{v0}} no existe', { v0: id }])
+  if (!w.active) fail(400, ['El almacén {{v0}} está inactivo', { v0: w.name }])
   return w
 }
 
@@ -547,7 +554,7 @@ function applyMovement(type: MovementType, product: Product, warehouse: Warehous
   body: MovementRequest, by: string, group?: string): Movement {
   const row = stockOf(product.id, warehouse.id)
   if (round3(row.quantity + delta) < 0) {
-    fail(409, `Stock insuficiente en ${warehouse.name}: disponible ${row.quantity} ${product.unit.code}`)
+    fail(409, ['Stock insuficiente en {{v0}}: disponible {{v1}} {{v2}}', { v0: warehouse.name, v1: row.quantity, v2: product.unit.code }])
   }
   row.quantity = round3(row.quantity + delta)
   const movement: Movement = {
@@ -563,14 +570,14 @@ function applyMovement(type: MovementType, product: Product, warehouse: Warehous
 
 function registerMovement(body: MovementRequest, by: string): Movement[] {
   const db = getDb()
-  const product = db.products.find((p) => p.id === body.productId) ?? fail(400, `El producto ${body.productId} no existe`)
+  const product = db.products.find((p) => p.id === body.productId) ?? fail(400, ['El producto {{v0}} no existe', { v0: body.productId }])
   const source = activeWarehouse(body.warehouseId)
   const qty = Number(body.quantity)
   if (!Number.isFinite(qty) || qty < 0) fail(400, 'Datos inválidos', { quantity: 'debe ser mayor o igual que 0' })
   const factor = 10 ** product.unit.decimals
   if (Math.abs(qty * factor - Math.round(qty * factor)) > 1e-9) {
-    fail(400, product.unit.decimals === 0 ? `La unidad ${product.unit.name} no admite decimales`
-      : `La unidad ${product.unit.name} admite hasta ${product.unit.decimals} decimales`)
+    fail(400, product.unit.decimals === 0 ? ['La unidad {{unit}} no admite decimales', { unit: product.unit.name }]
+      : ['La unidad {{unit}} admite hasta {{count}} decimales', { unit: product.unit.name, count: product.unit.decimals }])
   }
   const positive = () => { if (qty <= 0) fail(400, 'La cantidad debe ser mayor que cero') }
   switch (body.type) {
@@ -581,14 +588,14 @@ function registerMovement(body: MovementRequest, by: string): Movement[] {
       positive()
       return [applyMovement('OUT', product, source, -qty, body, by)]
     case 'ADJUSTMENT': {
-      if (!blank(body.reason)) fail(400, 'Indicá el motivo del ajuste')
+      if (!blank(body.reason)) fail(400, 'Indica el motivo del ajuste')
       const delta = round3(qty - stockOf(product.id, source.id).quantity)
       if (delta === 0) fail(400, 'El saldo contado coincide con el registrado; no hay nada que ajustar')
       return [applyMovement('ADJUSTMENT', product, source, delta, body, by)]
     }
     case 'TRANSFER': {
       positive()
-      if (!body.targetWarehouseId) fail(400, 'Indicá el almacén de destino')
+      if (!body.targetWarehouseId) fail(400, 'Indica el almacén de destino')
       if (body.targetWarehouseId === source.id) fail(400, 'El almacén de destino debe ser distinto del de origen')
       const target = activeWarehouse(body.targetWarehouseId)
       const group = crypto.randomUUID()
@@ -627,7 +634,7 @@ export const inventoryHandlers = [
     requireFields({ code: !body.code?.trim() && 'no debe estar vacío', name: !body.name?.trim() && 'no debe estar vacío' })
     const db = getDb()
     const code = body.code.trim().toUpperCase()
-    if (db.warehouses.some((w) => w.code === code)) fail(409, `Ya existe un almacén con el código ${code}`)
+    if (db.warehouses.some((w) => w.code === code)) fail(409, ['Ya existe un almacén con el código {{v0}}', { v0: code }])
     const warehouse: Warehouse = { id: nextId(), code, name: body.name.trim(), address: blank(body.address),
       active: body.active ?? true, audit: audit(user.username) }
     db.warehouses.push(warehouse)
@@ -636,10 +643,10 @@ export const inventoryHandlers = [
 
   http.put(url('/warehouses/:id'), guarded('inventory:write', async ({ request, params, user }) => {
     const db = getDb()
-    const warehouse = db.warehouses.find((w) => w.id === idParam(params)) ?? fail(404, `Almacén ${params.id} no existe`)
+    const warehouse = db.warehouses.find((w) => w.id === idParam(params)) ?? fail(404, ['Almacén {{v0}} no existe', { v0: params.id }])
     const body = (await request.json()) as WarehouseRequest
     const code = body.code.trim().toUpperCase()
-    if (db.warehouses.some((w) => w.id !== warehouse.id && w.code === code)) fail(409, `Ya existe un almacén con el código ${code}`)
+    if (db.warehouses.some((w) => w.id !== warehouse.id && w.code === code)) fail(409, ['Ya existe un almacén con el código {{v0}}', { v0: code }])
     Object.assign(warehouse, { code, name: body.name.trim(), address: blank(body.address), active: body.active ?? true })
     for (const m of db.movements) if (m.warehouse.id === warehouse.id) m.warehouse = { id: warehouse.id, code, name: warehouse.name }
     return HttpResponse.json(touch(warehouse, user.username))
@@ -647,9 +654,9 @@ export const inventoryHandlers = [
 
   http.delete(url('/warehouses/:id'), guarded('inventory:write', ({ params }) => {
     const db = getDb()
-    if (!db.warehouses.some((w) => w.id === idParam(params))) fail(404, `Almacén ${params.id} no existe`)
+    if (!db.warehouses.some((w) => w.id === idParam(params))) fail(404, ['Almacén {{v0}} no existe', { v0: params.id }])
     if (db.movements.some((m) => m.warehouse.id === idParam(params))) {
-      fail(409, 'El almacén tiene movimientos registrados; desactivalo en lugar de eliminarlo')
+      fail(409, 'El almacén tiene movimientos registrados; desactívalo en lugar de eliminarlo')
     }
     db.warehouses = db.warehouses.filter((w) => w.id !== idParam(params))
     return new HttpResponse(null, { status: 204 })
@@ -739,7 +746,7 @@ export const inventoryHandlers = [
     const p = new URL(request.url).searchParams
     const days = Math.min(366, Math.max(1, Number(p.get('days') ?? 30)))
     const tz = p.get('tz') || 'UTC'
-    try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }) } catch { return problem(400, `Zona horaria inválida: ${tz}`) }
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }) } catch { return problem(400, ['Zona horaria inválida: {{v0}}', { v0: tz }]) }
     const localDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d)
     const series: ActivityDay[] = []
     for (let i = days - 1; i >= 0; i--) {
@@ -798,7 +805,7 @@ export const inventoryHandlers = [
 function validateRole(body: RoleRequest) {
   requireFields({ name: (!body.name || !/^[A-Z0-9_]+$/.test(body.name)) && 'mayúsculas, números y guion bajo' })
   const unknown = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p))
-  if (unknown.length > 0) fail(400, `Permisos desconocidos: ${unknown.join(', ')}`)
+  if (unknown.length > 0) fail(400, ['Permisos desconocidos: {{v0}}', { v0: unknown.join(', ') }])
 }
 
 export const handlers = [...baseHandlers, ...inventoryHandlers]

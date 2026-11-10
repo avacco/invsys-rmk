@@ -23,7 +23,7 @@ public final class InventoryDtos {
 
     public record WarehouseRequest(
             @NotBlank @Size(max = 32) @Pattern(regexp = "^[A-Za-z0-9_-]+$",
-                    message = "solo letras, números, guion y guion bajo") String code,
+                    message = "{validation.warehouseCode}") String code,
             @NotBlank @Size(max = 100) String name,
             @Size(max = 255) String address,
             Boolean active) {}

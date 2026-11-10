@@ -24,7 +24,7 @@ public class AuthService {
 
     public record Session(User user, String accessToken, String refreshToken) {}
 
-    private static final String INVALID_CREDENTIALS = "Usuario o contraseña incorrectos";
+    private static final String INVALID_CREDENTIALS = "error.auth.invalidCredentials";
 
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
@@ -57,20 +57,20 @@ public class AuthService {
     @Transactional(noRollbackFor = UnauthorizedException.class)
     public Session refresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
-            throw new UnauthorizedException("Sesión no iniciada");
+            throw new UnauthorizedException("error.auth.noSession");
         }
         Instant now = clock.instant();
         RefreshToken current = refreshTokens.findByTokenHash(TokenService.hash(rawRefreshToken))
-                .orElseThrow(() -> new UnauthorizedException("Sesión inválida"));
+                .orElseThrow(() -> new UnauthorizedException("error.auth.invalidSession"));
         User user = current.getUser();
         if (current.isRevoked()) {
             refreshTokens.revokeAllForUser(user.getId(), now);
             audit.recordAs(user.getUsername(), AuditAction.SESSION_REVOKED, "user", user.getId(), user.getUsername());
-            throw new UnauthorizedException("Sesión inválida");
+            throw new UnauthorizedException("error.auth.invalidSession");
         }
         if (current.isExpired(now) || !user.isEnabled()) {
             current.revoke(now);
-            throw new UnauthorizedException("Sesión expirada");
+            throw new UnauthorizedException("error.auth.expiredSession");
         }
         current.revoke(now);
         return openSession(user, now);

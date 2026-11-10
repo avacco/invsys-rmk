@@ -7,8 +7,10 @@ import { Badge, Button, EmptyState, ErrorState, PageHeader, Pagination, SearchIn
 import { formatNumber } from '@/lib/format'
 import { useDebounce } from '@/lib/useDebounce'
 import { MovementForm } from './MovementForm'
+import { useTranslation } from 'react-i18next'
 
 export default function StockPage() {
+  const { t } = useTranslation()
   const { can } = useAuth()
   const canWrite = can('inventory:write')
   const [search, setSearch] = useState('')
@@ -38,37 +40,37 @@ export default function StockPage() {
 
   return (
     <>
-      <PageHeader title="Stock" description="Existencias por almacén, calculadas a partir de los movimientos."
-        actions={canWrite && <Button onClick={() => openForm()} icon={<Plus className="h-4 w-4" />}>Registrar movimiento</Button>} />
+      <PageHeader title={t('Stock')} description={t('Existencias por almacén, calculadas a partir de los movimientos.')}
+        actions={canWrite && <Button onClick={() => openForm()} icon={<Plus className="h-4 w-4" />}>{t('Registrar movimiento')}</Button>} />
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0) }} placeholder="Buscar por nombre o SKU" />
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0) }} placeholder={t('Buscar por nombre o SKU')} />
         {categories.data && (
-          <Select aria-label="Categoría" className="sm:w-auto" value={categoryId ?? ''}
+          <Select aria-label={t('Categoría')} className="sm:w-auto" value={categoryId ?? ''}
             onChange={(e) => { setCategoryId(e.target.value ? Number(e.target.value) : undefined); setPage(0) }}>
-            <option value="">Todas las categorías</option>
+            <option value="">{t('Todas las categorías')}</option>
             {categories.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         )}
         <label className="flex cursor-pointer items-center gap-2 font-medium">
           <input type="checkbox" className="h-4 w-4 accent-blue-600" checked={lowOnly} onChange={(e) => { setLowOnly(e.target.checked); setPage(0) }} />
-          Solo stock bajo
+          {t('Solo stock bajo')}
         </label>
       </div>
 
       {stock.isPending ? <Spinner /> : stock.isError ? <ErrorState error={stock.error} onRetry={() => void stock.refetch()} /> :
         stock.data.content.length === 0 ? (
-          <EmptyState title={lowOnly ? 'Ningún producto está por debajo del mínimo' : 'No hay productos activos'} />
+          <EmptyState title={lowOnly ? t('Ningún producto está por debajo del mínimo') : t('No hay productos activos')} />
         ) : (
           <>
             <Table>
               <thead>
                 <tr>
-                  <Th>Producto</Th>
+                  <Th>{t('Producto')}</Th>
                   {columns.map((w) => <Th key={w.id} className="text-right">{w.name}</Th>)}
-                  <Th className="text-right">Total</Th>
-                  <Th className="text-right">Mínimo</Th>
-                  <Th>Estado</Th>
+                  <Th className="text-right">{t('Total')}</Th>
+                  <Th className="text-right">{t('Mínimo')}</Th>
+                  <Th>{t('Estado')}</Th>
                   {canWrite && <Th />}
                 </tr>
               </thead>
@@ -87,10 +89,10 @@ export default function StockPage() {
                       })}
                       <Td className="text-right font-semibold">{formatNumber(row.total, d)} {row.product.unitCode}</Td>
                       <Td className="text-right text-gray-500">{formatNumber(row.minStock, d)}</Td>
-                      <Td>{row.low ? <Badge tone="amber">Stock bajo</Badge> : row.total === 0 ? <Badge>Sin stock</Badge> : <Badge tone="green">OK</Badge>}</Td>
+                      <Td>{row.low ? <Badge tone="amber">{t('Stock bajo')}</Badge> : row.total === 0 ? <Badge>{t('Sin stock')}</Badge> : <Badge tone="green">{t('OK')}</Badge>}</Td>
                       {canWrite && (
                         <Td>
-                          <Button variant="ghost" className="px-2" aria-label={`Registrar movimiento de ${row.product.name}`}
+                          <Button variant="ghost" className="px-2" aria-label={t('Registrar movimiento de {{name}}', { name: row.product.name })}
                             onClick={() => openForm(row.product.id)} icon={<ArrowLeftRight className="h-4 w-4" />} />
                         </Td>
                       )}

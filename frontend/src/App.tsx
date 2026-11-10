@@ -7,6 +7,7 @@ import { RequireAuth, RequirePermission } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
 import { EmptyState } from './components/ui'
 import LoginPage from './features/auth/LoginPage'
+import { useTranslation } from 'react-i18next'
 
 const HomePage = lazy(() => import('./features/home/HomePage'))
 const ProductsPage = lazy(() => import('./features/products/ProductsPage'))
@@ -23,6 +24,7 @@ const AuditPage = lazy(() => import('./features/audit/AuditPage'))
 const queryClient = createQueryClient()
 
 export function App() {
+  const { t } = useTranslation()
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
@@ -42,7 +44,7 @@ export function App() {
                 <Route path="suppliers" element={<RequirePermission permission="partners:read"><SuppliersPage /></RequirePermission>} />
                 <Route path="users" element={<RequirePermission permission="users:read"><UsersPage /></RequirePermission>} />
                 <Route path="roles" element={<RequirePermission permission="roles:read"><RolesPage /></RequirePermission>} />
-                <Route path="*" element={<EmptyState title="Página no encontrada" description="La dirección no existe." />} />
+                <Route path="*" element={<EmptyState title={t('Página no encontrada')} description={t('La dirección no existe.')} />} />
               </Route>
             </Route>
           </Routes>

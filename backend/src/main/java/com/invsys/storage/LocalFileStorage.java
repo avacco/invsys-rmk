@@ -34,14 +34,14 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public String storeImage(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
-            throw new BadRequestException("El archivo está vacío");
+            throw new BadRequestException("error.file.empty");
         }
         if (file.getSize() > MAX_IMAGE_BYTES) {
-            throw new BadRequestException("La imagen supera los 5 MB");
+            throw new BadRequestException("error.file.tooLarge");
         }
         String extension = IMAGE_TYPES.get(file.getContentType());
         if (extension == null) {
-            throw new BadRequestException("Formato no soportado. Usá PNG, JPG, WEBP o GIF");
+            throw new BadRequestException("error.file.format");
         }
         if (!folder.matches("[a-z0-9-]+")) {
             throw new IllegalArgumentException("Carpeta inválida: " + folder);

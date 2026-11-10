@@ -38,7 +38,7 @@ public final class IdentityDtos {
 
     public record CreateUserRequest(
             @NotBlank @Size(min = 3, max = 50) @Pattern(regexp = "^[a-zA-Z0-9._-]+$",
-                    message = "solo letras, números, punto, guion y guion bajo") String username,
+                    message = "{validation.code}") String username,
             @NotBlank @Size(max = 100) String displayName,
             @Email @Size(max = 255) String email,
             @NotBlank @Size(min = 8, max = 72) String password,
@@ -63,7 +63,7 @@ public final class IdentityDtos {
 
     public record RoleRequest(
             @NotBlank @Size(max = 50) @Pattern(regexp = "^[A-Z0-9_]+$",
-                    message = "mayúsculas, números y guion bajo") String name,
+                    message = "{validation.roleName}") String name,
             @Size(max = 255) String description,
             @NotNull Set<String> permissions) {}
 

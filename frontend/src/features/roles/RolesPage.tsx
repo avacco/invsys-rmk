@@ -11,14 +11,16 @@ import { RowActions } from '@/components/RowActions'
 import { Badge, Button, Card, ConfirmDialog, ErrorState, Field, Input, Modal, PageHeader, Spinner } from '@/components/ui'
 import { handleApiError } from '@/lib/errors'
 import { toast } from '@/store/toast'
+import { useTranslation } from 'react-i18next'
+import { tk } from '@/i18n'
 
 const RESOURCE_LABELS: Record<string, string> = {
-  catalog: 'Catálogo', inventory: 'Inventario', partners: 'Proveedores', users: 'Usuarios', roles: 'Roles', audit: 'Auditoría',
+  catalog: tk('Catálogo'), inventory: tk('Inventario'), partners: tk('Proveedores'), users: tk('Usuarios'), roles: tk('Roles'), audit: tk('Auditoría'),
 }
-const OPERATION_LABELS: Record<string, string> = { read: 'Ver', write: 'Editar' }
+const OPERATION_LABELS: Record<string, string> = { read: tk('Ver'), write: tk('Editar') }
 
 const schema = z.object({
-  name: z.string().trim().min(1, 'El nombre es obligatorio').max(50).regex(/^[A-Z0-9_]+$/, 'Mayúsculas, números y guion bajo'),
+  name: z.string().trim().min(1, tk('El nombre es obligatorio')).max(50).regex(/^[A-Z0-9_]+$/, tk('Mayúsculas, números y guion bajo')),
   description: z.string().max(255),
   permissions: z.array(z.string()),
 })
@@ -31,6 +33,7 @@ function groupByResource(perms: PermissionInfo[]) {
 }
 
 function RoleForm({ open, role, permissions, onClose }: { open: boolean; role: Role | null; permissions: PermissionInfo[]; onClose: () => void }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { register, handleSubmit, reset, setError, formState: { errors } } = useForm<Values>({ resolver: zodResolver(schema) })
   useEffect(() => {
@@ -46,28 +49,28 @@ function RoleForm({ open, role, permissions, onClose }: { open: boolean; role: R
   const onSubmit = handleSubmit(async (v) => {
     try {
       await save.mutateAsync(v)
-      toast.success(role ? 'Rol actualizado' : 'Rol creado')
+      toast.success(role ? t('Rol actualizado') : t('Rol creado'))
       onClose()
     } catch (e) {
       handleApiError(e, setError)
     }
   })
   return (
-    <Modal open={open} title={role ? `Editar rol ${role.name}` : 'Nuevo rol'} onClose={onClose}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" form="role-form" loading={save.isPending}>Guardar</Button></>}>
+    <Modal open={open} title={role ? t('Editar rol {{name}}', { name: role.name }) : t('Nuevo rol')} onClose={onClose}
+      footer={<><Button variant="secondary" onClick={onClose}>{t('Cancelar')}</Button><Button type="submit" form="role-form" loading={save.isPending}>{t('Guardar')}</Button></>}>
       <form id="role-form" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        <Field label="Nombre" htmlFor="r-name" error={errors.name?.message}><Input id="r-name" placeholder="AUDITOR" {...register('name')} /></Field>
-        <Field label="Descripción" htmlFor="r-desc" error={errors.description?.message}><Input id="r-desc" {...register('description')} /></Field>
+        <Field label={t('Nombre')} htmlFor="r-name" error={errors.name?.message}><Input id="r-name" placeholder={t('AUDITOR')} {...register('name')} /></Field>
+        <Field label={t('Descripción')} htmlFor="r-desc" error={errors.description?.message}><Input id="r-desc" {...register('description')} /></Field>
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Permisos</legend>
+          <legend className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('Permisos')}</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {groupByResource(permissions).map(([resource, perms]) => (
               <div key={resource} className="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                <p className="mb-2 font-medium">{RESOURCE_LABELS[resource] ?? resource}</p>
+                <p className="mb-2 font-medium">{t(RESOURCE_LABELS[resource] ?? resource)}</p>
                 {perms.map((p) => (
                   <label key={p.value} className="flex items-center gap-2 py-0.5">
                     <input type="checkbox" value={p.value} className="h-4 w-4 accent-blue-600" {...register('permissions')} />
-                    {OPERATION_LABELS[p.value.split(':')[1]] ?? p.value}
+                    {t(OPERATION_LABELS[p.value.split(':')[1]] ?? p.value)}
                   </label>
                 ))}
               </div>
@@ -80,6 +83,7 @@ function RoleForm({ open, role, permissions, onClose }: { open: boolean; role: R
 }
 
 export default function RolesPage() {
+  const { t } = useTranslation()
   const { can } = useAuth()
   const canWrite = can('roles:write')
   const qc = useQueryClient()
@@ -104,21 +108,21 @@ export default function RolesPage() {
 
   return (
     <>
-      <PageHeader title="Roles y permisos" description="Cada usuario tiene un rol; el rol define qué puede ver y editar."
-        actions={canWrite && <Button onClick={() => { setEditing(null); setOpen(true) }} icon={<Plus className="h-4 w-4" />}>Nuevo rol</Button>} />
+      <PageHeader title={t('Roles y permisos')} description={t('Cada usuario tiene un rol; el rol define qué puede ver y editar.')}
+        actions={canWrite && <Button onClick={() => { setEditing(null); setOpen(true) }} icon={<Plus className="h-4 w-4" />}>{t('Nuevo rol')}</Button>} />
       {roles.isPending ? <Spinner /> : roles.isError ? <ErrorState error={roles.error} onRetry={() => void roles.refetch()} /> : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {roles.data.map((r) => (
             <Card key={r.id} className="p-5">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="flex items-center gap-2 font-semibold">{r.name}{r.system && <Lock className="h-4 w-4 text-gray-400" aria-label="Rol de sistema" />}</h3>
+                  <h3 className="flex items-center gap-2 font-semibold">{r.name}{r.system && <Lock className="h-4 w-4 text-gray-400" aria-label={t('Rol de sistema')} />}</h3>
                   <p className="text-gray-500 dark:text-gray-400">{r.description ?? '—'}</p>
                 </div>
                 {canWrite && !r.system && <RowActions label={r.name} onEdit={() => { setEditing(r); setOpen(true) }} onDelete={() => setDeleting(r)} />}
               </div>
               <div className="flex flex-wrap gap-1">
-                {r.permissions.length === 0 ? <span className="text-gray-400">Sin permisos</span> :
+                {r.permissions.length === 0 ? <span className="text-gray-400">{t('Sin permisos')}</span> :
                   r.permissions.map((p) => <Badge key={p} tone="blue">{p}</Badge>)}
               </div>
             </Card>
@@ -126,8 +130,8 @@ export default function RolesPage() {
         </div>
       )}
       <RoleForm open={open} role={editing} permissions={permissions.data ?? []} onClose={() => setOpen(false)} />
-      <ConfirmDialog open={deleting !== null} title="Eliminar rol" loading={remove.isPending}
-        message={<>¿Eliminar el rol <strong>{deleting?.name}</strong>?</>}
+      <ConfirmDialog open={deleting !== null} title={t('Eliminar rol')} loading={remove.isPending}
+        message={t('¿Eliminar el rol «{{name}}»?', { name: deleting?.name })}
         onConfirm={() => void confirmDelete()} onCancel={() => setDeleting(null)} />
     </>
   )

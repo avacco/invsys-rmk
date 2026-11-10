@@ -125,7 +125,7 @@ public class ReportService {
         try {
             return ZoneId.of(id);
         } catch (DateTimeException e) {
-            throw new BadRequestException("Zona horaria inválida: " + id);
+            throw new BadRequestException("error.report.timezone", id);
         }
     }
 

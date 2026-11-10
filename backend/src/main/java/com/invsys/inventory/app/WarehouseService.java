@@ -37,7 +37,7 @@ public class WarehouseService {
     public WarehouseResponse create(WarehouseRequest request) {
         String code = request.code().trim().toUpperCase();
         if (warehouses.existsByCodeIgnoreCase(code)) {
-            throw new ConflictException("Ya existe un almacén con el código " + code);
+            throw new ConflictException("error.warehouse.duplicate", code);
         }
         Warehouse saved = warehouses.save(
                 new Warehouse(code, request.name().trim(), clean(request.address()), request.active() == null || request.active()));
@@ -49,7 +49,7 @@ public class WarehouseService {
         Warehouse warehouse = find(id);
         String code = request.code().trim().toUpperCase();
         if (warehouses.existsByCodeIgnoreCaseAndIdNot(code, id)) {
-            throw new ConflictException("Ya existe un almacén con el código " + code);
+            throw new ConflictException("error.warehouse.duplicate", code);
         }
         warehouse.update(code, request.name().trim(), clean(request.address()), request.active() == null || request.active());
         audit.record(AuditAction.UPDATE, "warehouse", id, warehouse.getName() + " (" + code + ")");
@@ -59,14 +59,14 @@ public class WarehouseService {
     public void delete(Long id) {
         Warehouse warehouse = find(id);
         if (movements.existsByWarehouseId(id)) {
-            throw new ConflictException("El almacén tiene movimientos registrados; desactivalo en lugar de eliminarlo");
+            throw new ConflictException("error.warehouse.hasMovements");
         }
         warehouses.delete(warehouse);
         audit.record(AuditAction.DELETE, "warehouse", id, warehouse.getName() + " (" + warehouse.getCode() + ")");
     }
 
     private Warehouse find(Long id) {
-        return warehouses.findById(id).orElseThrow(() -> new NotFoundException("Almacén", id));
+        return warehouses.findById(id).orElseThrow(() -> new NotFoundException("warehouse", id));
     }
 
     private static String clean(String value) {

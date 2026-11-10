@@ -75,7 +75,7 @@ public class InventoryService {
 
     private List<MovementResponse> doRegister(MovementRequest r) {
         Product product = products.findById(r.productId())
-                .orElseThrow(() -> new BadRequestException("El producto " + r.productId() + " no existe"));
+                .orElseThrow(() -> new BadRequestException("error.notFound.product", r.productId()));
         Warehouse source = activeWarehouse(r.warehouseId());
         BigDecimal quantity = normalize(r.quantity(), product.getUnit());
         String reason = clean(r.reason());
@@ -93,22 +93,22 @@ public class InventoryService {
             }
             case ADJUSTMENT -> {
                 if (reason == null) {
-                    throw new BadRequestException("Indicá el motivo del ajuste");
+                    throw new BadRequestException("error.stock.adjustmentReason");
                 }
                 StockLevel level = lock(product, source);
                 BigDecimal delta = quantity.subtract(level.getQuantity());
                 if (delta.signum() == 0) {
-                    throw new BadRequestException("El saldo contado coincide con el registrado; no hay nada que ajustar");
+                    throw new BadRequestException("error.stock.adjustmentNoChange");
                 }
                 yield List.of(apply(level, MovementType.ADJUSTMENT, product, source, delta, reason, reference, null, now));
             }
             case TRANSFER -> {
                 requirePositive(quantity);
                 if (r.targetWarehouseId() == null) {
-                    throw new BadRequestException("Indicá el almacén de destino");
+                    throw new BadRequestException("error.stock.targetRequired");
                 }
                 if (r.targetWarehouseId().equals(source.getId())) {
-                    throw new BadRequestException("El almacén de destino debe ser distinto del de origen");
+                    throw new BadRequestException("error.stock.sameWarehouse");
                 }
                 Warehouse target = activeWarehouse(r.targetWarehouseId());
                 // Bloqueo en orden de id para que dos transferencias cruzadas no se bloqueen mutuamente.
@@ -137,8 +137,8 @@ public class InventoryService {
     private MovementResponse apply(StockLevel level, MovementType type, Product product, Warehouse warehouse,
                                    BigDecimal delta, String reason, String reference, UUID group, Instant now) {
         if (level.getQuantity().add(delta).signum() < 0) {
-            throw new ConflictException("Stock insuficiente en %s: disponible %s %s".formatted(
-                    warehouse.getName(), level.getQuantity().stripTrailingZeros().toPlainString(), product.getUnit().getCode()));
+            throw new ConflictException("error.stock.insufficient", warehouse.getName(),
+                    level.getQuantity().stripTrailingZeros().toPlainString(), product.getUnit().getCode());
         }
         level.apply(delta, now);
         StockMovement movement = movements.save(new StockMovement(
@@ -149,9 +149,9 @@ public class InventoryService {
 
     private Warehouse activeWarehouse(Long id) {
         Warehouse warehouse = warehouses.findById(id)
-                .orElseThrow(() -> new BadRequestException("El almacén " + id + " no existe"));
+                .orElseThrow(() -> new BadRequestException("error.notFound.warehouse", id));
         if (!warehouse.isActive()) {
-            throw new BadRequestException("El almacén " + warehouse.getName() + " está inactivo");
+            throw new BadRequestException("error.warehouse.inactive", warehouse.getName());
         }
         return warehouse;
     }
@@ -160,16 +160,16 @@ public class InventoryService {
     private static BigDecimal normalize(BigDecimal quantity, Unit unit) {
         BigDecimal stripped = quantity.stripTrailingZeros();
         if (stripped.scale() > unit.getDecimals()) {
-            throw new BadRequestException(unit.getDecimals() == 0
-                    ? "La unidad %s no admite decimales".formatted(unit.getName())
-                    : "La unidad %s admite hasta %d decimales".formatted(unit.getName(), unit.getDecimals()));
+            throw unit.getDecimals() == 0
+                    ? new BadRequestException("error.stock.unitNoDecimals", unit.getName())
+                    : new BadRequestException("error.stock.unitDecimals", unit.getName(), unit.getDecimals());
         }
         return quantity.setScale(3, RoundingMode.UNNECESSARY);
     }
 
     private static void requirePositive(BigDecimal quantity) {
         if (quantity.signum() <= 0) {
-            throw new BadRequestException("La cantidad debe ser mayor que cero");
+            throw new BadRequestException("error.stock.positiveQuantity");
         }
     }
 

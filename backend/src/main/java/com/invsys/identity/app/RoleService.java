@@ -46,7 +46,7 @@ public class RoleService {
 
     public RoleResponse create(RoleRequest request) {
         if (roles.existsByNameIgnoreCase(request.name())) {
-            throw new ConflictException("Ya existe un rol con ese nombre");
+            throw new ConflictException("error.role.duplicate");
         }
         validatePermissions(request.permissions());
         Role saved = roles.save(new Role(request.name(), request.description(), request.permissions()));
@@ -57,10 +57,10 @@ public class RoleService {
     public RoleResponse update(Long id, RoleRequest request) {
         Role role = find(id);
         if (role.isSystem()) {
-            throw new BadRequestException("Los roles de sistema no se pueden modificar");
+            throw new BadRequestException("error.role.systemReadOnly");
         }
         if (roles.existsByNameIgnoreCaseAndIdNot(request.name(), id)) {
-            throw new ConflictException("Ya existe un rol con ese nombre");
+            throw new ConflictException("error.role.duplicate");
         }
         validatePermissions(request.permissions());
         role.update(request.name(), request.description(), request.permissions());
@@ -71,10 +71,10 @@ public class RoleService {
     public void delete(Long id) {
         Role role = find(id);
         if (role.isSystem()) {
-            throw new BadRequestException("Los roles de sistema no se pueden eliminar");
+            throw new BadRequestException("error.role.systemUndeletable");
         }
         if (users.countByRoleId(id) > 0) {
-            throw new ConflictException("El rol tiene usuarios asignados");
+            throw new ConflictException("error.role.inUse");
         }
         roles.delete(role);
         audit.record(AuditAction.DELETE, "role", id, role.getName());
@@ -89,13 +89,13 @@ public class RoleService {
     }
 
     private Role find(Long id) {
-        return roles.findById(id).orElseThrow(() -> new NotFoundException("Rol", id));
+        return roles.findById(id).orElseThrow(() -> new NotFoundException("role", id));
     }
 
     private static void validatePermissions(Set<String> permissions) {
         List<String> unknown = permissions.stream().filter(p -> Permission.fromValue(p).isEmpty()).sorted().toList();
         if (!unknown.isEmpty()) {
-            throw new BadRequestException("Permisos desconocidos: " + String.join(", ", unknown));
+            throw new BadRequestException("error.role.unknownPermissions", String.join(", ", unknown));
         }
     }
 }
