@@ -176,3 +176,7 @@ La demo se publica en GitHub Pages con el workflow **Demo en GitHub Pages**, que
 2. **Actions → Demo en GitHub Pages → Run workflow.**
 
 El sitio queda en `https://<usuario>.github.io/<repositorio>/`.
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Andres Vargas. Puedes usar, modificar y distribuir este proyecto libremente, incluso con fines comerciales, siempre que conserves el aviso de copyright.

@@ -141,3 +141,7 @@ CI runs all three suites on every push. The screenshots in this README are regen
 - **Another language:** a dictionary in `frontend/src/i18n` and a `messages_xx.properties` file in the backend.
 - **Another image store** (S3, Cloudinary): implement the `FileStorage` interface.
 - **Low-stock notifications:** `LowStockListener` already detects the event; only the channel (email, Slack…) is missing.
+
+## License
+
+[MIT](LICENSE) © 2026 Andres Vargas. You may use, modify and distribute this project freely, including commercially, as long as you keep the copyright notice.
